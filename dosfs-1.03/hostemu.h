@@ -1,3 +1,5 @@
+#include "../msast.h"
+
 /*
 	hostemu.h
 	DOSFS Embedded FAT-Compatible Filesystem
@@ -11,15 +13,16 @@
 #include <sys/types.h>
 
 // Override media sector functions
-#define DFS_ReadSector(unit,buffer,sector,count) DFS_HostReadSector(buffer,sector,count)
-#define DFS_WriteSector(unit,buffer,sector,count) DFS_HostWriteSector(buffer,sector,count)
+//#define DFS_ReadSector(unit,buffer,sector,count) DFS_HostReadSector(buffer,sector,count)
+//#define DFS_WriteSector(unit,buffer,sector,count) DFS_HostWriteSector(buffer,sector,count)
 
 
 /*
 	Attach emulation to a host-side disk image file
 	Returns 0 OK, nonzero for any error
 */
-int DFS_HostAttach(char *imagefile);
+//int DFS_HostAttach(char *imagefile);
+int DFS_HostAttach(tArchive *arch);
 
 /*
 	Read sector from image
@@ -33,5 +36,8 @@ int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count);
 */
 int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count);
 
+// ggn
+//int DFS_HostDetach(void);
+int DFS_HostDetach(tArchive *arch);
 
 #endif // _HOSTEMU_H

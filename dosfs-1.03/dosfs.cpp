@@ -1,3 +1,7 @@
+// File renamed to .cpp to address the craziness of mixing C and C++
+#define _CRT_SECURE_NO_WARNINGS
+#define ATARI_ST_BPB
+
 /*
 	DOSFS Embedded FAT-Compatible Filesystem
 	(C) 2005 Lewin A.R.W. Edwards (sysadm@zws.com)
@@ -73,6 +77,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	if(DFS_ReadSector(unit,scratchsector,startsector,1))
 		return DFS_ERRMISC;
 
+#if !defined(ATARI_ST_BPB)
 // tag: OEMID, refer dosfs.h
 //	strncpy(volinfo->oemid, lbr->oemid, 8);
 //	volinfo->oemid[8] = 0;
@@ -138,9 +143,53 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 		  (((uint32_t) lbr->ebpb.ebpb32.root_2) << 16) |
 		  (((uint32_t) lbr->ebpb.ebpb32.root_3) << 24);
 	}
+#else
+	// tag: OEMID, refer dosfs.h
+	//	strncpy(volinfo->oemid, lbr->oemid, 8);
+	//	volinfo->oemid[8] = 0;
+
+	// TODO: all sanity checks are for floppy images,
+	//       these are sure to be different (i.e. bigger) for hard disk partitions
+	// NOTE: a lot of these sanity check values are lifted from FastCopy Pro, so they should be reasonable
+
+	volinfo->secperclus = lbr->bpb.SPC;
+	if (volinfo->secperclus != 1 && volinfo->secperclus != 2 && volinfo->secperclus != 4 && volinfo->secperclus != 8)
+		return DFS_ERRMISC;
+
+	int bytes_per_sector = (lbr->bpb.BPS_h << 8) | lbr->bpb.BPS_l;
+	if (bytes_per_sector !=128 && bytes_per_sector !=256 && bytes_per_sector !=512 && bytes_per_sector !=1024)
+		return DFS_ERRMISC;
+
+	volinfo->numsecs = (lbr->bpb.NSECTS_l)|(lbr->bpb.NSECTS_h<<8);
+	if (volinfo->numsecs<1 && volinfo->numsecs>21) // caters for HD floppy drives
+		return DFS_ERRMISC;
+
+	volinfo->reservedsecs = (lbr->bpb.RES_l) | (lbr->bpb.RES_h << 8);
+	if (volinfo->reservedsecs > volinfo->numsecs)
+		return DFS_ERRMISC;
+
+	volinfo->secperfat = (lbr->bpb.SPF_l)|(lbr->bpb.SPF_h<<8);
+	if (volinfo->secperfat>16) // random guess
+		return DFS_ERRMISC;
+
+	volinfo->label[0] = 0; // For GEMDOS FAT12 this is a file on disk
+
+	// note: if rootentries is 0, we must be in a FAT32 volume.
+	volinfo->rootentries = (lbr->bpb.NDIRS_l)|(lbr->bpb.SPF_h<<8);
+	if (volinfo->rootentries > 240 || volinfo->rootentries < 16 || volinfo->rootentries % 16 != 0)
+		return DFS_ERRMISC;
+
+	// after extracting raw info we perform some useful precalculations
+	volinfo->fat1 = startsector + volinfo->reservedsecs;
+	if (!volinfo->fat1) volinfo->fat1 = 1;
+
+	volinfo->rootdir = volinfo->fat1 + (volinfo->secperfat * 2);
+	volinfo->dataarea = volinfo->rootdir + (((volinfo->rootentries * 32) + (SECTOR_SIZE - 1)) / SECTOR_SIZE);
+#endif
 
 	// Calculate number of clusters in data area and infer FAT type from this information.
 	volinfo->numclusters = (volinfo->numsecs - volinfo->dataarea) / volinfo->secperclus;
+
 	if (volinfo->numclusters < 4085)
 		volinfo->filesystem = FAT12;
 	else if (volinfo->numclusters < 65525)
@@ -319,12 +368,16 @@ uint32_t DFS_SetFAT(PVOLINFO volinfo, uint8_t *scratch, uint32_t *scratchcache, 
 			// If we wrote that sector OK, then read in the subsequent sector
 			// and poke the first byte with the remainder of this FAT entry.
 			if (DFS_OK == result) {
-				*scratchcache++;
+				// ggn: Original (in comment) caused ambiguities in some compilers
+				// *scratchcache++
+				(*scratchcache)++;
 				result = DFS_ReadSector(volinfo->unit, scratch, *scratchcache, 1);
 				if (DFS_OK == result) {
 					// Odd cluster: High 12 bits being set
 					if (cluster & 1) {
-						scratch[0] = new_contents & 0xff00;
+						// ggn: original (in comment) was wrong
+						//scratch[0] = new_contents & 0xff00;
+						scratch[0] = (new_contents & 0xff00) >> 8;
 					}
 					// Even cluster: Low 12 bits being set
 					else {
@@ -348,13 +401,18 @@ uint32_t DFS_SetFAT(PVOLINFO volinfo, uint8_t *scratch, uint32_t *scratchcache, 
 		else {
 			// Odd cluster: High 12 bits being set
 			if (cluster & 1) {
+				// ggn: original (in comment) was wrong
+				//scratch[offset] = (scratch[offset] & 0x0f) | new_contents & 0xf0;
+				//scratch[offset + 1] = new_contents & 0xff00;
 				scratch[offset] = (scratch[offset] & 0x0f) | new_contents & 0xf0;
-				scratch[offset+1] = new_contents & 0xff00;
+				scratch[offset + 1] = (new_contents & 0xff00) >> 8;
 			}
 			// Even cluster: Low 12 bits being set
 			else {
 				scratch[offset] = new_contents & 0xff;
-				scratch[offset+1] = (scratch[offset+1] & 0xf0) | new_contents & 0x0f;
+				// ggn: original (in comment) was wrong
+				//scratch[offset + 1] = (scratch[offset + 1] & 0xf0) | new_contents & 0x0f;
+				scratch[offset+1] = (scratch[offset+1] & 0xf0) | (new_contents>>8) & 0x0f;
 			}
 			result = DFS_WriteSector(volinfo->unit, scratch, *scratchcache, 1);
 			// mirror the FAT into copy 2
@@ -463,7 +521,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			// read first sector of directory
 			return DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->dataarea + ((volinfo->rootdir - 2) * volinfo->secperclus), 1);
 		}
-		else {
+		else { //if (volinfo->filesystem==FAT16) {
 			dirinfo->currentcluster = 0;
 			dirinfo->currentsector = 0;
 			dirinfo->currententry = 0;
@@ -471,6 +529,14 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			// read first sector of directory
 			return DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1);
 		}
+		//else { //ggn - something fishy is happening here, the original code had the same codepath for fat16+fat12, but the rootdir sector was then off-by-one. bizzare...
+		//	dirinfo->currentcluster = 0;
+		//	dirinfo->currentsector = 0;
+		//	dirinfo->currententry = 0;
+		//
+		//	// read first sector of directory
+		//	return DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1);
+		//}
 	}
 
 	// This is not the root directory. We need to find the start of this subdirectory.
@@ -490,7 +556,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->dataarea + ((volinfo->rootdir - 2) * volinfo->secperclus), 1))
 				return DFS_ERRMISC;
 		}
-		else {
+		else { //if (volinfo->filesystem == FAT16) {
 			dirinfo->currentcluster = 0;
 			dirinfo->currentsector = 0;
 			dirinfo->currententry = 0;
@@ -499,6 +565,15 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1))
 				return DFS_ERRMISC;
 		}
+		//else { //ggn - something fishy is happening here, the original code had the same codepath for fat16+fat12, but the rootdir sector was then off-by-one. bizzare...
+		//	dirinfo->currentcluster = 0;
+		//	dirinfo->currentsector = 0;
+		//	dirinfo->currententry = 0;
+		//
+		//	// read first sector of directory
+		//	if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1))
+		//		return DFS_ERRMISC;
+		//}
 
 		// skip leading path separators
 		while (*ptr == DIR_SEPARATOR && *ptr)
@@ -522,10 +597,16 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 					  ((uint32_t) de.startclus_h_l) << 16 |
 					  ((uint32_t) de.startclus_h_h) << 24;
 				}
-				else {
+				else if (volinfo->filesystem == FAT16) {
 					dirinfo->currentcluster = (uint32_t) de.startclus_l_l |
 					  ((uint32_t) de.startclus_l_h) << 8;
 				}
+				else { // ggn - FAT12
+					dirinfo->currentcluster = (uint32_t)de.startclus_l_l |
+						((uint32_t)de.startclus_l_h&0xf) << 8;
+					//volinfo->dataarea++;	// really not sure if this compensation is correct, but it seems to cure the off-by-one sector calculation below
+				}
+
 				dirinfo->currentsector = 0;
 				dirinfo->currententry = 0;
 
@@ -831,7 +912,11 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 			fileinfo->dirsector = volinfo->rootdir + di.currentsector;
 		else
 			fileinfo->dirsector = volinfo->dataarea + ((di.currentcluster - 2) * volinfo->secperclus) + di.currentsector;
-		fileinfo->diroffset = di.currententry - 1;
+		// ggn: Protect currententry when using a fresh+empty disk image
+		uint8_t currententry_clamped = di.currententry - 1;
+		if (di.currententry == 0) currententry_clamped = 0;
+		//fileinfo->diroffset = di.currententry - 1;
+		fileinfo->diroffset = currententry_clamped;
 		fileinfo->cluster = cluster;
 		fileinfo->firstcluster = cluster;
 		fileinfo->filelen = 0;
@@ -841,7 +926,8 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 		// tragically, so we have to re-read it
 		if (DFS_ReadSector(volinfo->unit, scratch, fileinfo->dirsector, 1))
 			return DFS_ERRMISC;
-		memcpy(&(((PDIRENT) scratch)[di.currententry-1]), &de, sizeof(DIRENT));
+		//memcpy(&(((PDIRENT) scratch)[di.currententry-1]), &de, sizeof(DIRENT));
+		memcpy(&(((PDIRENT)scratch)[currententry_clamped]), &de, sizeof(DIRENT));
 		if (DFS_WriteSector(volinfo->unit, scratch, fileinfo->dirsector, 1))
 			return DFS_ERRMISC;
 
@@ -1192,6 +1278,10 @@ uint32_t DFS_WriteFile(PFILEINFO fileinfo, uint8_t *scratch, uint8_t *buffer, ui
 
 		*successcount += byteswritten;
 
+		// ggn: Corner case where size is a multiple of a cluster: don't run the following as it
+		//      will allocate an extra cluster
+		if (!remain) break;
+
 		// check to see if we stepped over a cluster boundary
 		if (div(fileinfo->pointer - byteswritten, fileinfo->volinfo->secperclus * SECTOR_SIZE).quot !=
 		  div(fileinfo->pointer, fileinfo->volinfo->secperclus * SECTOR_SIZE).quot) {
@@ -1223,7 +1313,7 @@ uint32_t DFS_WriteFile(PFILEINFO fileinfo, uint8_t *scratch, uint8_t *buffer, ui
 
 				// Mark newly allocated cluster as end of chain			
 				switch(fileinfo->volinfo->filesystem) {
-					case FAT12:		tempclus = 0xff8;	break;
+					case FAT12:		tempclus = 0xfff;	break; // ggn: Changed this from ff8 for debugging (matching GEMDOS' behaviour)
 					case FAT16:		tempclus = 0xfff8;	break;
 					case FAT32:		tempclus = 0x0ffffff8;	break;
 					default:		return DFS_ERRMISC;

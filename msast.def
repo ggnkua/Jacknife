@@ -3,7 +3,9 @@ EXPORTS
 	ReadHeader
 	ProcessFile
 	CloseArchive
+	PackFiles
+	DeleteFiles
 	SetChangeVolProc
 	SetProcessDataProc
-	CanYouHandleThisFile
 	GetPackerCaps
+	CanYouHandleThisFile

@@ -16,9 +16,13 @@ uint32_t DFS_WriteSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_
 
 //===================================================================
 // Configurable items
-#define MAX_PATH		64		// Maximum path length (increasing this will
+#define MAX_PATH		260		// Maximum path length (increasing this will
 								// GREATLY increase stack requirements!)
+#if _WIN32
+#define DIR_SEPARATOR	'\\'	// character separating directory components
+#else
 #define DIR_SEPARATOR	'/'		// character separating directory components
+#endif
 
 // End of configurable items
 //===================================================================
@@ -160,6 +164,29 @@ typedef struct _tagBPB {
 	uint8_t sectors_l_3;		// large num sectors high byte
 } BPB, *PBPB;
 
+typedef struct _Atari_ST_BPB
+{
+	uint8_t BPS_l;		// 0x000B - This is an Intel format WORD (low byte first) which indicates the number of bytes per sector on the disk.
+	uint8_t BPS_h;
+	uint8_t SPC;		// 0x000D - This is a BYTE which indicates the number of sectors per cluster on the disk.
+	uint8_t RES_l;
+	uint8_t RES_h;		// 0x000E - This is an Intel format WORD which indicates the number of reserved sectors at the beginning of the media (usually one for floppies).
+	uint8_t NFATS;
+	uint8_t NDIRS_l;		// 0x0011 - This is an Intel format WORD indicating the number of ROOT directory entries.
+	uint8_t NDIRS_h;
+	uint8_t NSECTS_l;	// 0x0013 - This is an Intel format WORD indicating the number of sectors on the disk (including those reserved).
+	uint8_t NSECTS_h;
+	uint8_t MEDIA;		// 0x0015 - This BYTE is a media descriptor. Hard disks set this value to 0xF8, otherwise it is unused.
+	uint8_t SPF_l;		// 0x0016 - This is an Intel format WORD indicating the number of sectors per FAT.
+	uint8_t SPF_h;
+	uint8_t SPT_l;		// 0x0018 - This is an Intel format WORD indicating the number of sectors per track.
+	uint8_t SPT_h;
+	uint8_t NSIDES_l;	// 0x001A - This is an Intel format WORD indicating the number of sides on the disk.
+	uint8_t NSIDES_h;
+	uint8_t NHID_l;		// 0x001C - This is an Intel format WORD indicating the number of hidden sectors on a disk (currently ignored).
+	uint8_t NHID_h;
+} STBPB, *PSTBPB;
+
 /*
 	Extended BIOS Parameter Block structure (FAT12/16)
 */
@@ -212,6 +239,7 @@ typedef struct _tagEBPB32 {
 	Logical Boot Record structure (volume boot sector)
 */
 typedef struct _tagLBR {
+#if !defined(ATARI_ST_BPB)
 	uint8_t jump[3];			// JMP instruction
 	uint8_t oemid[8];			// OEM ID, space-padded
 	BPB bpb;					// BIOS Parameter Block
@@ -222,6 +250,14 @@ typedef struct _tagLBR {
 	uint8_t code[420];			// boot sector code
 	uint8_t sig_55;				// 0x55 signature byte
 	uint8_t sig_aa;				// 0xaa signature byte
+#else
+	uint16_t bra;				// This WORD contains a 680x0 BRA.S instruction to the boot code in this sector if the disk is executable, otherwise it is unused.
+	uint8_t oem[6];				// These six bytes are reserved for use as any necessary filler information. The disk-based TOS loader program places the string 'Loader' here.
+	uint8_t serial[3];			// The low 24-bits of this LONG represent a unique disk serial number.
+	STBPB bpb;
+	uint8_t code[482];			// This area is used by any executable boot code. The code must be completely relocatable as its loaded position in memory is not guaranteed.
+	uint16_t checksum[2];		// The entire boot sector WORD summed with this Motorola format WORD will equal 0x1234 if the boot sector is executable or some other value if not.
+#endif
 } LBR, *PLBR;
 
 /*
