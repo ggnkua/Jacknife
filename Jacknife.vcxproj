@@ -22,7 +22,7 @@
     <VCProjectVersion>16.0</VCProjectVersion>
     <ProjectGuid>{0AB90127-F54F-4E5E-B1D0-E40F2859A985}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>MSASTWCX</RootNamespace>
+    <RootNamespace>Jacknife</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -72,22 +72,22 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
-    <TargetName>msast_d</TargetName>
+    <TargetName>jacknife_d</TargetName>
     <TargetExt>.wcx</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <TargetName>masast_d</TargetName>
+    <TargetName>jacknife</TargetName>
     <TargetExt>.wcx64</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
-    <TargetName>msast</TargetName>
+    <TargetName>jacknife</TargetName>
     <TargetExt>.wcx</TargetExt>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <TargetName>msast</TargetName>
+    <TargetName>jacknife</TargetName>
     <TargetExt>.wcx64</TargetExt>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
@@ -95,7 +95,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;_DEBUG;MSASTWCX_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;_DEBUG;JACKNIFE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -106,7 +106,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>.\msast.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>.\jacknife.def</ModuleDefinitionFile>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Version>0.03</Version>
     </Link>
@@ -116,7 +116,7 @@
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;MSASTWCX_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;JACKNIFE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -127,7 +127,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>.\msast.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>.\jacknife.def</ModuleDefinitionFile>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
@@ -138,7 +138,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>WIN32;NDEBUG;MSASTWCX_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>WIN32;NDEBUG;JACKNIFE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -150,7 +150,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>.\msast.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>.\jacknife.def</ModuleDefinitionFile>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <Version>0.03</Version>
     </Link>
@@ -165,7 +165,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;MSASTWCX_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;JACKNIFE_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>
       </PrecompiledHeaderFile>
@@ -181,13 +181,13 @@
       </OptimizeReferences>
       <GenerateDebugInformation>DebugFull</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <ModuleDefinitionFile>.\msast.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>.\jacknife.def</ModuleDefinitionFile>
       <AdditionalDependencies>odbc32.lib;odbccp32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
       <Command>copy $(TargetPath) $(SolutionDir)install\
-powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)install\msast_wcx_ctrlpagedownonly\*.inf', '$(SolutionDir)install\readme.md' -DestinationPath '$(SolutionDir)install\msast_wcx_ctrlpagedownonly.zip' -Force
-powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)install\msast_wcx\*.inf', '$(SolutionDir)install\readme.md' -DestinationPath '$(SolutionDir)install\msast_wcx.zip' -Force</Command>
+powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)install\jacknife_ctrlpagedownonly\*.inf', '$(SolutionDir)install\readme.md' -DestinationPath '$(SolutionDir)install\jacknife_ctrlpagedownonly.zip' -Force
+powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)install\jacknife\*.inf', '$(SolutionDir)install\readme.md' -DestinationPath '$(SolutionDir)install\jacknife.zip' -Force</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
@@ -196,11 +196,11 @@ powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)
     <ClCompile Include="dosfs-1.03\hostemu.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="msast.h" />
+    <ClInclude Include="jacknife.h" />
     <ClInclude Include="wcxhead.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="msast.def" />
+    <None Include="jacknife.def" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

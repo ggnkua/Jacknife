@@ -1,7 +1,7 @@
 //#include "PetitFAT/pff.h"
 
-#ifndef MSAST_H
-#define MSAST_H
+#ifndef JACKNIFE_H
+#define JACKNIFE_H
 
 #define DISKMODE_LINEAR 0
 #define DISKMODE_MSA 1

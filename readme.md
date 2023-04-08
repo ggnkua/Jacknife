@@ -1,4 +1,5 @@
-# Total Commander .ST/.MSA packer plugin v0.03
+# Jacknife
+## (formely known as "Total Commander .ST/.MSA packer plugin v0.03")
 
 This little plugin enables Total Commander to open and extract Atari ST .ST and .MSA disk images that have a valid file system in it.
 
@@ -14,5 +15,5 @@ Say you already have e.g. an emulator associated with the .ST/.MSA extensions an
 Just open **msast_wcx_ctrlpagedownonly.zip** in Total Commander and follow the install procedure. Now the plugin is associated with some gibberish extension you'll probly never use and that keeps the extension out of your way in TC when .ST and .MSA filesare shown; but *at the same time* you can simply open .ST/.MSA files by pressing **CTRL+Page Down** on a selected disk image. Magic!
 
 ## Credits
-FAT12/16/32 reader "PetitFAT" taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
-
+- FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
+- DOSFS library obtained from http://www.larwe.com/zws/products/dosfs/index.html, modified and debugged (especially for FAT12)

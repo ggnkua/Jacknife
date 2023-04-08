@@ -29,12 +29,12 @@
     <ClInclude Include="wcxhead.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
-    <ClInclude Include="msast.h">
+    <ClInclude Include="jacknife.h">
       <Filter>Headerdateien</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="msast.def">
+    <None Include="jacknife.def">
       <Filter>Quelldateien</Filter>
     </None>
   </ItemGroup>

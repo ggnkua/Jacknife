@@ -16,7 +16,7 @@
 #include <string.h>
 
 #include "../wcxhead.h"
-#include "../msast.h"
+#include "../jacknife.h"
 
 uint8_t *unpack_msa(/*const char *file, */tArchive *arch, uint8_t *packedMsa, int PackedSize);
 

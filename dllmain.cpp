@@ -12,7 +12,7 @@
 #define ATARI_ST_BPB
 #include "dosfs-1.03/dosfs.h"
 #include "dosfs-1.03/hostemu.h"
-#include "msast.h"
+#include "jacknife.h"
 
 uint32_t DFS_ReadSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t count)
 {
