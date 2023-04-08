@@ -1,5 +1,3 @@
-//#include "PetitFAT/pff.h"
-
 #ifndef JACKNIFE_H
 #define JACKNIFE_H
 
@@ -15,8 +13,6 @@ typedef int(__stdcall *tProcessDataProc)(char *FileName, int Size);
 
 typedef struct stEntryList
 {
-	//DIR dir;
-	//FILINFO fno;
 	DIRINFO di;
 	DIRENT de;
 	char fileWPath[MAX_PATH + 1];
@@ -29,12 +25,10 @@ typedef struct
 {
 	char archname[MAX_PATH];
 	VOLINFO vi;
-	//FATFS fatfs;
 	stEntryList* currentEntry;
 	stEntryList* lastEntry;
 	int mode;
 	FILE* fp;
-	//uint8_t* unpackedMsa;
 	bool volume_dirty;
 	int unpackedMsaSize;
 	int unpackedMsaSectors;

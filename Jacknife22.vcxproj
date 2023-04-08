@@ -186,6 +186,7 @@
     </Link>
     <PostBuildEvent>
       <Command>copy $(TargetPath) $(SolutionDir)install\
+copy readme.md $(SolutionDir)install\
 powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)install\jacknife_ctrlpagedownonly\*.inf', '$(SolutionDir)install\readme.md' -DestinationPath '$(SolutionDir)install\jacknife_ctrlpagedownonly.zip' -Force
 powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)install\jacknife\*.inf', '$(SolutionDir)install\readme.md' -DestinationPath '$(SolutionDir)install\jacknife.zip' -Force</Command>
     </PostBuildEvent>

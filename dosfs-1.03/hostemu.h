@@ -13,9 +13,6 @@
 #include <sys/types.h>
 
 // Override media sector functions
-//#define DFS_ReadSector(unit,buffer,sector,count) DFS_HostReadSector(buffer,sector,count)
-//#define DFS_WriteSector(unit,buffer,sector,count) DFS_HostWriteSector(buffer,sector,count)
-
 
 /*
 	Attach emulation to a host-side disk image file

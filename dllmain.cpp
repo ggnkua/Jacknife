@@ -7,7 +7,6 @@
 #include <windows.h>
 
 #include "wcxhead.h"
-//#include "PetitFAT/pff.h"
 
 #define ATARI_ST_BPB
 #include "dosfs-1.03/dosfs.h"
@@ -63,16 +62,11 @@ void DirToCanonical(char *dest, uint8_t *src)
 	*dest = 0;
 }
 
-//FRESULT scan_files(char *path)
 uint32_t scan_files(char* path, VOLINFO *vi)
 {
-	//FRESULT res;
 	uint32_t res;
 	int i;
-	//DIR dir;
-	//VOLINFO vi;
 	DIRINFO di;
-	//DIRENT de;
 
 	uint8_t *scratch_sector=(uint8_t *)malloc(SECTOR_SIZE);
 	if (!scratch_sector) return DFS_ERRMISC;
@@ -80,61 +74,47 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 	di.scratch = scratch_sector;
 	stEntryList *lastEntry;
 
-	//res = pf_opendir(&dir, path);
 	res = DFS_OpenDir(vi, (uint8_t *)path, &di);
-	//if (res == FR_OK) {
 	if (res == DFS_OK) {
 		i = strlen(path);
 		for (;;) {
 			lastEntry = findLastEntry();
 			res = DFS_GetNext(vi, &di, &(*lastEntry).de);
-			//res = pf_readdir(&dir, &(*lastEntry).fno);
 			if (res != DFS_OK) break;
 			if (lastEntry->de.name[0] == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0) continue;
-			//if (res != FR_OK || lastEntry->fno.fname[0] == 0) break;
 			DirToCanonical(lastEntry->filename_canonical, lastEntry->de.name);
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {
 				strcpy((char *)vi->label, lastEntry->filename_canonical);
 				continue;
 			}
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
-			//if (lastEntry->fno.fattrib & AM_DIR) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if (strlen(path)+strlen(lastEntry->filename_canonical) +1 >= MAX_PATH ||
 					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s\\%s", path, lastEntry->filename_canonical) == -1) {
-				//if (strlen(path) + strlen(lastEntry->fno.fname) + 1 >= MAX_PATH ||
-				//	sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s\\%s", path, lastEntry->fno.fname)==-1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
 					sprintf_s(&path[i], MAX_PATH - i, "\\%s", lastEntry->filename_canonical)==-1) {
-				//if (i + strlen(lastEntry->fno.fname) + 1 >= MAX_PATH ||
-				//	sprintf_s(&path[i], MAX_PATH - i, "\\%s", lastEntry->fno.fname)==-1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
 				lastEntry->next = new stEntryList();
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
-				//lastEntry->next->dir = dir;
 				lastEntry->next->di = di;
 				lastEntry = lastEntry->next;
 				res = scan_files(path, vi);
 				di.scratch = scratch_sector;
-				//if (res != FR_OK) break;
 				if (res != DFS_OK && res != DFS_EOF) break;
 				path[i] = 0;
 			}
 			else {
-				//printf("%s/%s\n", path, lastEntry->fno.fname);
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if ( strlen(path)+strlen(lastEntry->filename_canonical)+1>=MAX_PATH ||
 					 sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s\\%s", path, lastEntry->filename_canonical) == -1) {
-//				if ( strlen(path)+strlen(lastEntry->fno.fname)+1>=MAX_PATH ||
-//					 sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s\\%s", path, lastEntry->fno.fname) == -1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
@@ -142,7 +122,6 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
 				lastEntry->next->di = di;
-				//lastEntry->next->dir = dir;
 				lastEntry = lastEntry->next;
 			}
 		}
@@ -154,28 +133,7 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 }
 
 //unpack MSA into a newly created buffer
-BYTE* unpack_msa(/*const char *file, */tArchive *arch, uint8_t *packedMsa, int packedSize) {
-	/*FILE *fp;
-	fopen_s(&fp,file, "rb+");
-	if (fp == NULL) {
-		return NULL;
-	}
-	fseek(fp, 0, SEEK_END);
-	int packedSize = ftell(fp);
-	if (packedSize <= 0) {
-		return NULL;
-	}
-	fseek(fp, 0, SEEK_SET);
-
-	BYTE* packedMsa = (BYTE*)malloc(packedSize);
-	size_t ret = fread(packedMsa, packedSize, 1, fp);
-	fclose(fp);
-
-	if (packedMsa[0] != 0x0e || packedMsa[1] != 0x0f) {
-		free(packedMsa);
-		return NULL;
-	}
-	*/
+BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 	int sectors = ((int)packedMsa[2] << 8) | ((int)packedMsa[3]);
 	int sides = (((int)packedMsa[4] << 8) | ((int)packedMsa[5])) + 1;
 	int startTrack = ((int)packedMsa[6] << 8) | ((int)packedMsa[7]);
@@ -209,6 +167,7 @@ BYTE* unpack_msa(/*const char *file, */tArchive *arch, uint8_t *packedMsa, int p
 					return 0;
 				}
 				if (unpackedData[out - 1] == 0xe5) {
+					// Bounds check against corrupt MSA images
 					if (offset + 4 >= packedSize)
 					{
 						free(unpackedData);
@@ -222,12 +181,12 @@ BYTE* unpack_msa(/*const char *file, */tArchive *arch, uint8_t *packedMsa, int p
 					out--;
 					for (unsigned int ii = 0; ii < runLen && out < unpackedSize; ii++) {
 						unpackedData[out++] = data;
-						// Bounds check against corrupt MSA images
 					}
 				}
 			}
 		}
 		else {
+			// Bounds check against corrupt MSA images
 			if (out + trackLen > unpackedSize || offset + trackLen >= packedSize)
 			{
 				free(unpackedData);
@@ -235,20 +194,16 @@ BYTE* unpack_msa(/*const char *file, */tArchive *arch, uint8_t *packedMsa, int p
 			}
 			for (; trackLen > 0; trackLen--) {
 				unpackedData[out++] = packedMsa[offset++];
-				// Bounds check against corrupt MSA images
 			}
 		}
 	}
-	//free(packedMsa);
 	return unpackedData;
 }
-
 
 tArchive* Open(tOpenArchiveData* ArchiveData)
 {
 	uint32_t result;
 	tArchive* arch = NULL;
-	//DWORD result;
 
 	ArchiveData->CmtBuf = 0;
 	ArchiveData->CmtBufSize = 0;
@@ -269,20 +224,6 @@ tArchive* Open(tOpenArchiveData* ArchiveData)
 
 	pCurrentArchive = arch;
 
-	//arch->mode = DISKMODE_LINEAR;
-	//if (strlen(arch->archname) > 4) {
-	//	if (_strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0) {
-	//		arch->mode = DISKMODE_MSA;
-	//		arch->unpackedMsa = unpack_msa(arch->archname, arch);
-	//	}
-	//}
-
-
-
-	//we don't _need_ to do that during MSA mode, but, hell...
-	//fopen_s(&arch->fp,arch->archname, "rb+");
-
-	//if (pf_mount(&arch->fatfs) != FR_OK)
 	if (DFS_HostAttach(arch) != DFS_OK)
 	{
 		ArchiveData->OpenResult = E_BAD_ARCHIVE;
@@ -312,7 +253,6 @@ tArchive* Open(tOpenArchiveData* ArchiveData)
 
 	char path[MAX_PATH + 1];
 	path[0] = 0;
-//	if (scan_files((char*)&path) != FR_OK) {
 	result = scan_files((char *)&path, &arch->vi);
 	if (result != DFS_OK && result != DFS_EOF) {
 		arch->currentEntry = &entryList;
@@ -348,14 +288,10 @@ int NextItem(tArchive* hArcData, tHeaderData* HeaderData)
 	0x10 Directory
 	0x20 Archive file
 	*/
-	//HeaderData->FileAttr = arch->currentEntry->fno.fattrib;
 	HeaderData->FileAttr = arch->currentEntry->de.attr;
 	//FileTime = (year - 1980) << 25 | month << 21 | day << 16 | hour << 11 | minute << 5 | second / 2;
-	//HeaderData->FileTime = arch->currentEntry->fno.ftime+(arch->currentEntry->fno.fdate<<16);
 	HeaderData->FileTime = (arch->currentEntry->de.crttime_h << 8) | (arch->currentEntry->de.crttime_h) | (arch->currentEntry->de.crtdate_h << 24) | (arch->currentEntry->de.crtdate_h << 16);
-	//HeaderData->PackSize = arch->currentEntry->fno.fsize;
 	HeaderData->PackSize = arch->currentEntry->de.filesize_0 | (arch->currentEntry->de.filesize_1 << 8) | (arch->currentEntry->de.filesize_2 << 16) | (arch->currentEntry->de.filesize_3 << 24);
-	//HeaderData->UnpSize = arch->currentEntry->fno.fsize;
 	HeaderData->UnpSize = HeaderData->PackSize;
 	HeaderData->CmtBuf = 0;
 	HeaderData->CmtBufSize = 0;
@@ -367,7 +303,6 @@ int NextItem(tArchive* hArcData, tHeaderData* HeaderData)
 
 	arch->lastEntry = arch->currentEntry;
 
-	//if (arch->currentEntry->next != NULL && arch->currentEntry->next->next == NULL) {
 	if (arch->currentEntry->next == NULL) {
 		return E_END_ARCHIVE;
 	}
@@ -381,29 +316,23 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	if (Operation == PK_SKIP || Operation == PK_TEST) return 0;
 	tArchive* arch = (tArchive*)(hArcData);
 	if (Operation == PK_EXTRACT && arch->lastEntry != NULL) {
-		//FRESULT res;
 		uint32_t res;
-		//res = pf_open(arch->lastEntry->fileWPath);
 		FILEINFO fi;
 		res = DFS_OpenFile(&arch->vi, (uint8_t *)arch->lastEntry->fileWPath, DFS_READ, scratch_sector, &fi);
-		//if (res != FR_OK) {
 		if (res != DFS_OK) {
 			return E_EREAD;
 		}
 		unsigned int readLen;
 		unsigned int len;
-		//len = arch->lastEntry->fno.fsize;
-		len = fi.filelen;// (arch->lastEntry->de.filesize_3 << 24) | (arch->lastEntry->de.filesize_2 << 16) | (arch->lastEntry->de.filesize_1 << 8) | arch->lastEntry->de.filesize_0;
+		len = fi.filelen;
 		unsigned char *buf = (BYTE *)calloc(1, len + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
-		//res = pf_read(buf, len, &readLen);
 		res = DFS_ReadFile(&fi, scratch_sector, buf, &readLen, len);
-		//if (res != FR_OK) {
 		if (res != DFS_OK) {
 			free(buf);
 			return E_EREAD;
 		}
 		if (DestPath == NULL) {
-			//DestName contains the full pathand file nameand DestPath is NULL
+			// DestName contains the full path and file nameand DestPath is NULL
 			FILE* f;
 			fopen_s(&f,DestName, "wb");
 			if (f == NULL) {
@@ -419,7 +348,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 			fclose(f);
 		}
 		else {
-			//DestName contains only the file name and DestPath the file path
+			// DestName contains only the file name and DestPath the file path
 			char file[MAX_PATH];
 			sprintf_s(file,MAX_PATH, "%s\\%s", DestPath, DestName);
 			FILE* f;
@@ -448,12 +377,7 @@ int Close(tArchive* hArcData)
 {
 	tArchive* arch = (tArchive*)(hArcData);
 	pCurrentArchive = NULL;
-	//fclose(arch->fp); 
 	DFS_HostDetach(arch);
-	//if (arch->mode == DISKMODE_MSA && arch->unpackedMsa != NULL) {
-	//	free(arch->unpackedMsa);
-	//}
-	//kill filelist
 	stEntryList* entry = &entryList;
 	while (entry->next != NULL) {
 		if (entry->prev != NULL && entry->prev != &entryList) {
@@ -484,9 +408,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		return archive_data.OpenResult;
 	}
 
-	//FRESULT res;
 	uint32_t res;
-	//res = pf_open(PackedFile);
 	FILEINFO fi;
 	uint8_t scratch_sector[SECTOR_SIZE];
 	char filename_source[MAX_PATH];
@@ -505,10 +427,8 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		strcpy(filename_dest, "\\");
 	}
 	strcpy(filename_source, SrcPath);
-	//strcat(filename, "\\");
 	char *filename_subpath = filename_source + strlen(filename_source);
 	char *current_file = AddList;
-	//strcpy(filename_dest, "\\");
 	while (*current_file) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
 	{
 		strcpy(filename_subpath, current_file);
@@ -522,7 +442,6 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		if (file_size < 0) {
 			return E_NO_FILES;
 		}
-		// TODO: add a sort of an upper limit to file size depending on FAT12/16/32?
 		unsigned char *read_buf = (unsigned char *)calloc(1, file_size + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
 		if (!read_buf)
 		{
@@ -535,18 +454,14 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 		fclose(handle_to_add);
 		strcat(&filename_dest[1], current_file);
-		//res = pf_open(pf_filename);
 		res = DFS_OpenFile(&archive_handle->vi, (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi);
-		//if (res != FR_OK) {
 		if (res != DFS_OK) {
 			free(read_buf);
 			Close(archive_handle);
 			return E_ECREATE;
 		}
 		UINT bytes_written;
-		//res = pf_write(read_buf, file_size, &bytes_written);
 		res = DFS_WriteFile(&fi, scratch_sector, read_buf, &bytes_written, file_size);
-		//if (res != FR_OK) {
 		if (res != DFS_OK) {
 			free(read_buf);
 			Close(archive_handle);
@@ -599,7 +514,6 @@ int Delete(char *PackedFile, char *DeleteList)
 	}
 
 	uint32_t res;
-	//FILEINFO fi;
 	uint8_t scratch_sector[SECTOR_SIZE];
 
 	while (*DeleteList) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
