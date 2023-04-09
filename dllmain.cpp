@@ -168,7 +168,7 @@ BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 				}
 				if (unpackedData[out - 1] == 0xe5) {
 					// Bounds check against corrupt MSA images
-					if (offset + 4 >= packedSize)
+					if (offset + 4 - 1 > packedSize)
 					{
 						free(unpackedData);
 						return 0;

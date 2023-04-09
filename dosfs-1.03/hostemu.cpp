@@ -48,7 +48,7 @@ int DFS_HostAttach(tArchive *arch)
 		cached_into_ram = true;
 		disk_cache = (uint8_t *)malloc(file_size);
 		if (!disk_cache) return -1;
-		if (!fread(disk_cache, file_size, 1, hostfile)) return -1;
+		if (!fread(disk_cache, file_size, 1, hostfile)) { fclose(hostfile); return -1; }
 		fclose(hostfile);
 		arch->mode = DISKMODE_LINEAR;
 		if (disk_cache[0] == 0xe && disk_cache[1] == 0xf)
