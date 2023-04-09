@@ -4,7 +4,13 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <string.h>
+
+#ifdef _WIN32
 #include <windows.h>
+#define PATH_SEPERATOR "\\"
+#else
+#define PATH_SEPERATOR "/"
+#endif
 
 #include "wcxhead.h"
 
@@ -92,12 +98,12 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if (strlen(path)+strlen(lastEntry->filename_canonical) +1 >= MAX_PATH ||
-					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s\\%s", path, lastEntry->filename_canonical) == -1) {
+					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s", path, lastEntry->filename_canonical) == -1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
-					sprintf_s(&path[i], MAX_PATH - i, "\\%s", lastEntry->filename_canonical)==-1) {
+					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPERATOR, lastEntry->filename_canonical)==-1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
@@ -114,7 +120,7 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 			else {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if ( strlen(path)+strlen(lastEntry->filename_canonical)+1>=MAX_PATH ||
-					 sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s\\%s", path, lastEntry->filename_canonical) == -1) {
+					 sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s", path, lastEntry->filename_canonical) == -1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
@@ -350,7 +356,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		else {
 			// DestName contains only the file name and DestPath the file path
 			char file[MAX_PATH];
-			sprintf_s(file,MAX_PATH, "%s\\%s", DestPath, DestName);
+			sprintf_s(file,MAX_PATH, "%s" PATH_SEPERATOR "%s", DestPath, DestName);
 			FILE* f;
 			fopen_s(&f,file, "wb");
 			if (f == NULL) {
@@ -420,11 +426,11 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	if (SubPath)
 	{
 		strcpy(filename_dest, SubPath);
-		strcat(filename_dest, "\\");
+		strcat(filename_dest, PATH_SEPERATOR);
 	}
 	else
 	{
-		strcpy(filename_dest, "\\");
+		strcpy(filename_dest, PATH_SEPERATOR);
 	}
 	strcpy(filename_source, SrcPath);
 	char *filename_subpath = filename_source + strlen(filename_source);
