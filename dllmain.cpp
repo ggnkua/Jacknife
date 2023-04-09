@@ -453,7 +453,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		size_t items_read = fread(read_buf, file_size, 1, handle_to_add);
 
 		fclose(handle_to_add);
-		strcat(&filename_dest[1], current_file);
+		strcpy(&filename_dest[1], current_file);
 		res = DFS_OpenFile(&archive_handle->vi, (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi);
 		if (res != DFS_OK) {
 			free(read_buf);
