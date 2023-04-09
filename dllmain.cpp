@@ -76,7 +76,7 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 
 	res = DFS_OpenDir(vi, (uint8_t *)path, &di);
 	if (res == DFS_OK) {
-		i = strlen(path);
+		i = (int)strlen(path);
 		for (;;) {
 			lastEntry = findLastEntry();
 			res = DFS_GetNext(vi, &di, &(*lastEntry).de);
@@ -339,7 +339,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 				free(buf);
 				return E_EWRITE;
 			}
-			int wlen = fwrite(buf, 1, len, f);
+			size_t wlen = fwrite(buf, 1, len, f);
 			if (wlen != len) {
 				free(buf);
 				fclose(f);
@@ -357,7 +357,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 				free(buf);
 				return E_EWRITE;
 			}
-			int wlen = fwrite(buf, 1, len, f);
+			size_t wlen = fwrite(buf, 1, len, f);
 			if (wlen != len) {
 				free(buf);
 				fclose(f);

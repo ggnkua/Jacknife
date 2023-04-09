@@ -131,7 +131,7 @@ static int pack_track(unsigned char *dest, const unsigned char *src, int len) {
 		const unsigned char *prev = p;
 		unsigned int pkv = *p++;
 		while (p < src_end && *p == pkv) p++;
-		int n = p - prev;
+		int n = (int)(p - prev);
 		if ((n >= 4 || pkv == 0xE5) && pklen + 4 < len) {
 			*dest++ = 0xE5;
 			*dest++ = pkv;
@@ -192,7 +192,7 @@ uint8_t *make_msa(tArchive *arch)
 			p += sectors * 512;
 		}
 	}
-	file_size = pack - packed_buffer;
+	file_size = (int)(pack - packed_buffer);
 	return packed_buffer;
 }
 
