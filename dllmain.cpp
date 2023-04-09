@@ -214,34 +214,19 @@ BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 	return unpackedData;
 }
 
-tArchive* Open(tOpenArchiveData* ArchiveData)
+bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 {
-	uint32_t result;
-	tArchive* arch = NULL;
-
 	ArchiveData->CmtBuf = 0;
 	ArchiveData->CmtBufSize = 0;
 	ArchiveData->CmtSize = 0;
 	ArchiveData->CmtState = 0;
-
 	ArchiveData->OpenResult = E_NO_MEMORY;// default error type
-	if ((arch = new tArchive) == NULL)
-	{
-		return NULL;
-	}
-
-	arch->volume_dirty = false;
-
-	// trying to open
-	memset(arch, 0, sizeof(tArchive));
-	strcpy_s(arch->archname,MAX_PATH, ArchiveData->ArcName);
-
-	pCurrentArchive = arch;
 
 	if (DFS_HostAttach(arch) != DFS_OK)
 	{
 		ArchiveData->OpenResult = E_BAD_ARCHIVE;
-		goto error;
+		return false;
+		//goto error;
 	}
 
 	uint32_t partition_start_sector /*, partition_size*/;
@@ -259,14 +244,39 @@ tArchive* Open(tOpenArchiveData* ArchiveData)
 
 	if (DFS_GetVolInfo(0, scratch_sector, partition_start_sector, &arch->vi)) {
 		//printf("Error getting volume information\n");
+		ArchiveData->OpenResult = E_BAD_DATA;
+		return false;
+		//goto error;
+	}
+
+	ArchiveData->OpenResult = 0;// ok
+	return true;
+}
+
+tArchive* Open(tOpenArchiveData* ArchiveData)
+{
+	tArchive* arch = NULL;
+
+	if ((arch = new tArchive) == NULL)
+	{
 		return NULL;
 	}
+	memset(arch, 0, sizeof(tArchive));
+	arch->volume_dirty = false;
+	strcpy_s(arch->archname,MAX_PATH, ArchiveData->ArcName);
+	pCurrentArchive = arch;
+
+	// trying to open
+	if (!OpenImage(ArchiveData, arch))
+		goto error;
 
 	entryList.next = NULL;
 	entryList.prev = NULL;
 
 	char path[MAX_PATH + 1];
 	path[0] = 0;
+
+	uint32_t result;
 	result = scan_files((char *)&path, &arch->vi);
 	if (result != DFS_OK && result != DFS_EOF) {
 		arch->currentEntry = &entryList;
@@ -328,7 +338,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 {
 	uint8_t scratch_sector[SECTOR_SIZE];
 	if (Operation == PK_SKIP || Operation == PK_TEST) return 0;
-	tArchive* arch = (tArchive*)(hArcData);
+	tArchive *arch = hArcData;
 	if (Operation == PK_EXTRACT && arch->lastEntry != NULL) {
 		uint32_t res;
 		FILEINFO fi;
@@ -408,10 +418,12 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 {
 	if (!AddList || *AddList == 0) return E_NO_FILES;
 	tOpenArchiveData archive_data = { 0 };
-	archive_data.ArcName = PackedFile;
-	tArchive *archive_handle;
-	archive_handle = Open(&archive_data);
-	if (!archive_handle)
+	tArchive archive_handle = { 0 };
+	//archive_data.ArcName = PackedFile;
+	strcpy(archive_handle.archname, PackedFile);
+	//archive_handle = Open(&archive_data);
+	bool status = OpenImage(&archive_data, &archive_handle);
+	if (!status)
 	{
 		// This is what Open() returns if it reaches an error (archive_handle=NULL).
 		// However, since the return sctruct is deleted before returned, we pass this error manually here
@@ -459,7 +471,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		unsigned char *read_buf = (unsigned char *)calloc(1, file_size + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
 		if (!read_buf)
 		{
-			Close(archive_handle);
+			DFS_HostDetach(&archive_handle);
 			return E_NO_MEMORY;
 		}
 		fseek(handle_to_add, 0, SEEK_SET);
@@ -468,38 +480,38 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		{
 			fclose(handle_to_add);
 			free(read_buf);
-			Close(archive_handle);
+			DFS_HostDetach(&archive_handle);
 			return E_EREAD;
 		}
 
 		fclose(handle_to_add);
 		strcpy(&filename_dest[1], current_file);
-		res = DFS_OpenFile(&archive_handle->vi, (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi);
+		res = DFS_OpenFile(&archive_handle.vi, (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi);
 		if (res != DFS_OK) {
 			free(read_buf);
-			Close(archive_handle);
+			DFS_HostDetach(&archive_handle);
 			return E_ECREATE;
 		}
 		UINT bytes_written;
 		res = DFS_WriteFile(&fi, scratch_sector, read_buf, &bytes_written, file_size);
 		if (res != DFS_OK) {
 			free(read_buf);
-			Close(archive_handle);
+			DFS_HostDetach(&archive_handle);
 			return E_EWRITE;
 		}
 		if (bytes_written != file_size)
 		{
 			// Out of disk space - unsure what error to return here
 			free(read_buf);
-			Close(archive_handle);
+			DFS_HostDetach(&archive_handle);
 			return E_TOO_MANY_FILES;
 		}
 		free(read_buf);
 		// Point to next file (or NULL termination)
 		current_file += strlen(current_file) + 1;
 	}
-	archive_handle->volume_dirty = true;
-	Close(archive_handle);
+	archive_handle.volume_dirty = true;
+	DFS_HostDetach(&archive_handle);
 	if (Flags & PK_PACK_MOVE_FILES)
 	{
 		//LPCSTR *temp_list = (LPCSTR)AddList;
