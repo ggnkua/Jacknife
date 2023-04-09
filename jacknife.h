@@ -18,7 +18,6 @@ typedef int(__stdcall *tProcessDataProc)(char *FileName, int Size);
 
 typedef struct stEntryList
 {
-	DIRINFO di;
 	DIRENT de;
 	char fileWPath[MAX_PATH + 1];
 	char filename_canonical[13];

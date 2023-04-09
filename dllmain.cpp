@@ -118,7 +118,6 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 				lastEntry->next = new stEntryList();
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
-				lastEntry->next->di = di;
 				lastEntry = lastEntry->next;
 				res = scan_files(path, vi);
 				di.scratch = scratch_sector;
@@ -135,7 +134,6 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 				lastEntry->next = new stEntryList();
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
-				lastEntry->next->di = di;
 				lastEntry = lastEntry->next;
 			}
 		}
