@@ -1,6 +1,11 @@
 #ifndef JACKNIFE_H
 #define JACKNIFE_H
 
+#ifdef _WIN32
+#else
+#define __stdcall
+#endif
+
 #define DISKMODE_LINEAR 0
 #define DISKMODE_MSA 1
 

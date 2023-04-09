@@ -10,6 +10,14 @@
 #define PATH_SEPERATOR "\\"
 #else
 #define PATH_SEPERATOR "/"
+#define __stdcall
+#define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
+#define strcpy_s(a,b,c) strcpy(a,c)
+#define fopen_s(a,b,c) fopen(b,c)
+#define _strcmpi strcasecmp
+#define BYTE unsigned char
+#define UINT unsigned int
+#define BOOL bool
 #endif
 
 #include "wcxhead.h"
@@ -617,6 +625,7 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 	return false;
 }
 
+#ifdef _WIN32
 // The DLL entry point
 BOOL APIENTRY DllMain(HANDLE hModule,
     DWORD  ul_reason_for_call,
@@ -625,3 +634,4 @@ BOOL APIENTRY DllMain(HANDLE hModule,
 {
     return TRUE;
 }
+#endif
