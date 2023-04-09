@@ -699,7 +699,15 @@ uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 	}
 
 	if (dirent->name[0] == 0xe5)	// handle deleted file entries
+	{
 		dirent->name[0] = 0;
+		// ggn: If we don't exit here, dirinfo->currententry will be increased by one.
+		//      This was causing problems in DFS_Openfile, so with the addition of the
+		//      following 2 lines, the problem of creating a file on an empty disk
+		//      (DFS_Openfile would try to write outside the FAT buffer) goes away
+		if (dirinfo->flags & DFS_DI_BLANKENT)
+			return DFS_OK;
+	}
 	else if ((dirent->attr & ATTR_LONG_NAME) == ATTR_LONG_NAME)
 		dirent->name[0] = 0;
 	else if (dirent->name[0] == 0x05)	// handle kanji filenames beginning with 0xE5
@@ -912,11 +920,11 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 			fileinfo->dirsector = volinfo->rootdir + di.currentsector;
 		else
 			fileinfo->dirsector = volinfo->dataarea + ((di.currentcluster - 2) * volinfo->secperclus) + di.currentsector;
-		// ggn: Protect currententry when using a fresh+empty disk image
-		uint8_t currententry_clamped = di.currententry - 1;
-		if (di.currententry == 0) currententry_clamped = 0;
+		// ggn: The original code would write outside the FAT buffer on an empty disk. A couple of ideas were tried
+		//      (like clamping the value if it's 0 originally), but this led to more problems in the long run.
+		//      So a differnt approach was tried in DFS_GetNext() which removes the need to decrease di.currententry by 1.
 		//fileinfo->diroffset = di.currententry - 1;
-		fileinfo->diroffset = currententry_clamped;
+		fileinfo->diroffset = di.currententry;
 		fileinfo->cluster = cluster;
 		fileinfo->firstcluster = cluster;
 		fileinfo->filelen = 0;
@@ -927,7 +935,7 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 		if (DFS_ReadSector(volinfo->unit, scratch, fileinfo->dirsector, 1))
 			return DFS_ERRMISC;
 		//memcpy(&(((PDIRENT) scratch)[di.currententry-1]), &de, sizeof(DIRENT));
-		memcpy(&(((PDIRENT)scratch)[currententry_clamped]), &de, sizeof(DIRENT));
+		memcpy(&(((PDIRENT)scratch)[di.currententry]), &de, sizeof(DIRENT));
 		if (DFS_WriteSector(volinfo->unit, scratch, fileinfo->dirsector, 1))
 			return DFS_ERRMISC;
 
