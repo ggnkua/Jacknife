@@ -449,8 +449,14 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			return E_NO_MEMORY;
 		}
 		fseek(handle_to_add, 0, SEEK_SET);
-		// TODO: handle read error?
 		size_t items_read = fread(read_buf, file_size, 1, handle_to_add);
+		if (!items_read)
+		{
+			fclose(handle_to_add);
+			free(read_buf);
+			Close(archive_handle);
+			return E_EREAD;
+		}
 
 		fclose(handle_to_add);
 		strcpy(&filename_dest[1], current_file);
