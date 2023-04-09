@@ -199,7 +199,7 @@ BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 		}
 		else {
 			// Bounds check against corrupt MSA images
-			if (out + trackLen > unpackedSize || offset + trackLen >= packedSize)
+			if (out + trackLen > unpackedSize || offset + trackLen > packedSize)
 			{
 				free(unpackedData);
 				return 0;
