@@ -49,7 +49,8 @@ int DFS_HostAttach(tArchive *arch)
 		if (!fread(disk_image.image_buffer, disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
 		fclose(disk_image.file_handle);
 		arch->mode = DISKMODE_LINEAR;
-		if (disk_image.image_buffer[0] == 0xe && disk_image.image_buffer[1] == 0xf)
+		if ((disk_image.image_buffer[0] == 0xe && disk_image.image_buffer[1] == 0xf) ||
+			(disk_image.image_buffer[0] == 0x0 && disk_image.image_buffer[1] == 0x0 && strlen(arch->archname) > 4 && _strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0))
 		{
 			arch->mode = DISKMODE_MSA;
 			uint8_t *unpacked_msa = unpack_msa(arch, disk_image.image_buffer, disk_image.file_size);
