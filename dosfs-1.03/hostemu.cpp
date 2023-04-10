@@ -1,5 +1,6 @@
 // File renamed to .cpp to address the craziness of mixing C and C++
 #define _CRT_SECURE_NO_WARNINGS
+#include <assert.h>
 
 /*
 	hostemu.c
@@ -18,14 +19,11 @@
 #include "../wcxhead.h"
 #include "../jacknife.h"
 
-uint8_t *unpack_msa(/*const char *file, */tArchive *arch, uint8_t *packedMsa, int PackedSize);
+uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int PackedSize);
 
 //===================================================================
 // Globals
-FILE *hostfile;			// references host-side image file
-bool cached_into_ram;	// Should we just load the whole thing into RAM?
-uint8_t *disk_cache;	// Buffer for the above
-int file_size;			// Size of the above buffer
+DISK_IMAGE_INFO disk_image = { 0 };
 
 /*
 	Attach emulation to a host-side disk image file
@@ -33,38 +31,38 @@ int file_size;			// Size of the above buffer
 */
 int DFS_HostAttach(tArchive *arch)
 {
-	hostfile = fopen(arch->archname, "r+b");
-	if (hostfile == NULL)
+	disk_image.file_handle = fopen(arch->archname, "r+b");
+	if (disk_image.file_handle == NULL)
 		return -1;
 
-	fseek(hostfile, 0, SEEK_END);
-	file_size = ftell(hostfile);
-	fseek(hostfile, 0, SEEK_SET);
+	fseek(disk_image.file_handle, 0, SEEK_END);
+	disk_image.file_size = ftell(disk_image.file_handle);
+	fseek(disk_image.file_handle, 0, SEEK_SET);
 
-	cached_into_ram = false;
-	if (file_size <= 2880 * 1024)
+	disk_image.cached_into_ram = false;
+	if (disk_image.file_size <= 2880 * 1024)
 	{
 		// Definitely a disk image, let's cache it into RAM
-		cached_into_ram = true;
-		disk_cache = (uint8_t *)malloc(file_size);
-		if (!disk_cache) return -1;
-		if (!fread(disk_cache, file_size, 1, hostfile)) { fclose(hostfile); return -1; }
-		fclose(hostfile);
+		disk_image.cached_into_ram = true;
+		disk_image.image_buffer = (uint8_t *)malloc(disk_image.file_size);
+		if (!disk_image.image_buffer) return -1;
+		if (!fread(disk_image.image_buffer, disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
+		fclose(disk_image.file_handle);
 		arch->mode = DISKMODE_LINEAR;
-		if (disk_cache[0] == 0xe && disk_cache[1] == 0xf)
+		if (disk_image.image_buffer[0] == 0xe && disk_image.image_buffer[1] == 0xf)
 		{
 			arch->mode = DISKMODE_MSA;
-			uint8_t *unpacked_msa = unpack_msa(arch, disk_cache, file_size);
-			free(disk_cache);
+			uint8_t *unpacked_msa = unpack_msa(arch, disk_image.image_buffer, disk_image.file_size);
+			free(disk_image.image_buffer);
 			if (!unpacked_msa)
 			{
 				return -1;
 			}
-			disk_cache = unpacked_msa;
-			file_size = arch->unpackedMsaSize;
+			disk_image.image_buffer = unpacked_msa;
+			disk_image.file_size = arch->unpackedMsaSize;
 			//return 0;
 		}
-		cached_into_ram = true;
+		disk_image.cached_into_ram = true;
 	}
 
 	return 0;	// OK
@@ -76,21 +74,28 @@ int DFS_HostAttach(tArchive *arch)
 */
 int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 {
+	if (disk_image.use_one_side_only)
+	{
+		// Wonky disk image detected, let's skip the second side from the image
+		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
+		sector = (sector / disk_image.sectors_per_track) * (disk_image.sectors_per_track * 2) + sector % disk_image.sectors_per_track;
+	}
+
 	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
-	if ((int)(sector * SECTOR_SIZE) > file_size)
+	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
 		return -1;
 
-	if (cached_into_ram)
+	if (disk_image.cached_into_ram)
 	{
-		memcpy(buffer, &disk_cache[sector * SECTOR_SIZE], SECTOR_SIZE);
+		memcpy(buffer, &disk_image.image_buffer[sector * SECTOR_SIZE], SECTOR_SIZE);
 		return 0;
 	}
 	else
 	{
-		if (fseek(hostfile, sector * SECTOR_SIZE, SEEK_SET))
+		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
 			return -1;
 
-		fread(buffer, SECTOR_SIZE, count, hostfile);
+		fread(buffer, SECTOR_SIZE, count, disk_image.file_handle);
 		return 0;
 	}
 }
@@ -101,22 +106,29 @@ int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 */
 int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 {
+	if (disk_image.use_one_side_only)
+	{
+		// Wonky disk image detected, let's skip the second side from the image
+		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
+		sector = (sector / disk_image.sectors_per_track) * (disk_image.sectors_per_track * 2) + sector % disk_image.sectors_per_track;
+	}
+
 	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
-	if ((int)(sector * SECTOR_SIZE) > file_size)
+	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
 		return -1;
 
-	if (cached_into_ram)
+	if (disk_image.cached_into_ram)
 	{
-		memcpy(&disk_cache[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
+		memcpy(&disk_image.image_buffer[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
 		return 0;
 	}
 	else
 	{
-		if (fseek(hostfile, sector * SECTOR_SIZE, SEEK_SET))
+		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
 			return -1;
 
-		fwrite(buffer, SECTOR_SIZE, count, hostfile);
-		fflush(hostfile);
+		fwrite(buffer, SECTOR_SIZE, count, disk_image.file_handle);
+		fflush(disk_image.file_handle);
 		return 0;
 	}
 }
@@ -172,7 +184,7 @@ uint8_t *make_msa(tArchive *arch)
 	pack += 10;
 
 	int track;
-	unsigned char *p = disk_cache;
+	unsigned char *p = disk_image.image_buffer;
 	for (track = 0; track < end_track + 1; ++track) {
 		int side;
 		for (side = 0; side < sides; ++side) {
@@ -192,18 +204,18 @@ uint8_t *make_msa(tArchive *arch)
 			p += sectors * 512;
 		}
 	}
-	file_size = (int)(pack - packed_buffer);
+	disk_image.file_size = (int)(pack - packed_buffer);
 	return packed_buffer;
 }
 
 // ggn
 int DFS_HostDetach(tArchive *arch)
 {
-	if (cached_into_ram)
+	if (disk_image.cached_into_ram)
 	{
 		if (!arch->volume_dirty)
 		{
-			free(disk_cache);
+			free(disk_image.image_buffer);
 			return 0;
 		}
 		if (arch->mode == DISKMODE_MSA)
@@ -211,22 +223,22 @@ int DFS_HostDetach(tArchive *arch)
 			uint8_t *packed_msa = make_msa(arch);
 			if (!packed_msa)
 			{
-				free(disk_cache); 
+				free(disk_image.image_buffer);
 				return -1;
 			}
-			free(disk_cache);
-			disk_cache = packed_msa;
+			free(disk_image.image_buffer);
+			disk_image.image_buffer = packed_msa;
 		}		
-		hostfile = fopen(arch->archname, "wb");
-		if (!hostfile) return -1;
-		fwrite(disk_cache, file_size, 1, hostfile);
-		free(disk_cache);
-		fclose(hostfile);
+		disk_image.file_handle = fopen(arch->archname, "wb");
+		if (!disk_image.file_handle) return -1;
+		fwrite(disk_image.image_buffer, disk_image.file_size, 1, disk_image.file_handle);
+		free(disk_image.image_buffer);
+		fclose(disk_image.file_handle);
 		return 0;
 	}
 	else
 	{
-		if (!hostfile) return -1;
-		return fclose(hostfile);
+		if (!disk_image.file_handle) return -1;
+		return fclose(disk_image.file_handle);
 	}
 }

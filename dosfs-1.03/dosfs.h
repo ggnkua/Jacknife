@@ -172,7 +172,7 @@ typedef struct _Atari_ST_BPB
 	uint8_t RES_l;
 	uint8_t RES_h;		// 0x000E - This is an Intel format WORD which indicates the number of reserved sectors at the beginning of the media (usually one for floppies).
 	uint8_t NFATS;
-	uint8_t NDIRS_l;		// 0x0011 - This is an Intel format WORD indicating the number of ROOT directory entries.
+	uint8_t NDIRS_l;	// 0x0011 - This is an Intel format WORD indicating the number of ROOT directory entries.
 	uint8_t NDIRS_h;
 	uint8_t NSECTS_l;	// 0x0013 - This is an Intel format WORD indicating the number of sectors on the disk (including those reserved).
 	uint8_t NSECTS_h;

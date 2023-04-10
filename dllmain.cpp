@@ -173,7 +173,7 @@ BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 			for (; trackLen > 0; trackLen--) {
 				unpackedData[out++] = packedMsa[offset++];
 				// Bounds check against corrupt MSA images
-				if (out > unpackedSize || offset >= packedSize)
+				if (out > unpackedSize || offset > packedSize)
 				{
 					free(unpackedData);
 					return 0;
@@ -235,6 +235,7 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 	// 
 	//pstart = DFS_GetPtnStart(0, sector, 0, &pactive, &ptype, &psize);
 	//if (pstart == 0xffffffff) {
+	// 
 	//	printf("Cannot find first partition\n");
 	//	return -1;
 	//}
@@ -248,6 +249,7 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 	}
 
 	ArchiveData->OpenResult = 0;// ok
+
 	return true;
 }
 

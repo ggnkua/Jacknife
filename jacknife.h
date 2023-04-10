@@ -44,4 +44,14 @@ typedef struct
 	tProcessDataProc pLocProcessData;
 }  tArchive;
 
+typedef struct DISK_IMAGE_INFO_
+{
+	FILE *file_handle;			// references host-side image file
+	uint8_t *image_buffer;		// Buffer for the above
+	int		file_size;			// Size of the above buffer
+	bool	cached_into_ram;	// Should we just load the whole thing into RAM?
+	bool	use_one_side_only;	// See dosfs.cpp for an explanation why this even exists
+	int		sectors_per_track;	// Only required if the bool above is true
+} DISK_IMAGE_INFO;
+
 #endif

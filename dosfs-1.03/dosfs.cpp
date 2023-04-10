@@ -1,7 +1,6 @@
 // File renamed to .cpp to address the craziness of mixing C and C++
 #define _CRT_SECURE_NO_WARNINGS
 #define ATARI_ST_BPB
-
 /*
 	DOSFS Embedded FAT-Compatible Filesystem
 	(C) 2005 Lewin A.R.W. Edwards (sysadm@zws.com)
@@ -16,6 +15,10 @@
 #include <stdlib.h>
 
 #include "dosfs.h"
+
+#include <stdio.h>
+#include "../jacknife.h"
+extern DISK_IMAGE_INFO disk_image;
 
 /*
 	Get starting sector# of specified partition on drive #unit
@@ -144,10 +147,6 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 		  (((uint32_t) lbr->ebpb.ebpb32.root_3) << 24);
 	}
 #else
-	// tag: OEMID, refer dosfs.h
-	//	strncpy(volinfo->oemid, lbr->oemid, 8);
-	//	volinfo->oemid[8] = 0;
-
 	// TODO: all sanity checks are for floppy images,
 	//       these are sure to be different (i.e. bigger) for hard disk partitions
 	// NOTE: a lot of these sanity check values are lifted from FastCopy Pro, so they should be reasonable
@@ -181,9 +180,22 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 
 	// after extracting raw info we perform some useful precalculations
 	volinfo->fat1 = startsector + volinfo->reservedsecs;
-	if (!volinfo->fat1) volinfo->fat1 = 1;
+	if (!volinfo->fat1) volinfo->fat1 = 1;	// ggn: GEMDOS specific
+
+	int sides = (lbr->bpb.NSIDES_h << 8) | lbr->bpb.NSIDES_l;
+	if (sides==1 && disk_image.file_size / SECTOR_SIZE / 2 == volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16)
+	{
+		// ggn: Most likely the image is double sided but the BPB reports 1 side.
+		//      So... trying to access anything other than track 0 side 0 is going to point to garbage.
+		//      There are a few ways to work around this (just don't use images like that would be the obvious one, sheesh!)
+		//		but we'll just inform the disk sector read/write routines about this, so they will adjust the offsets
+		//		behind everyone's back
+		disk_image.use_one_side_only = true;
+		disk_image.sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
+	}
 
 	volinfo->rootdir = volinfo->fat1 + (volinfo->secperfat * 2);
+
 	volinfo->dataarea = volinfo->rootdir + (((volinfo->rootentries * 32) + (SECTOR_SIZE - 1)) / SECTOR_SIZE);
 #endif
 
@@ -521,7 +533,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			// read first sector of directory
 			return DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->dataarea + ((volinfo->rootdir - 2) * volinfo->secperclus), 1);
 		}
-		else { //if (volinfo->filesystem==FAT16) {
+		else {
 			dirinfo->currentcluster = 0;
 			dirinfo->currentsector = 0;
 			dirinfo->currententry = 0;
@@ -529,14 +541,6 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			// read first sector of directory
 			return DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1);
 		}
-		//else { //ggn - something fishy is happening here, the original code had the same codepath for fat16+fat12, but the rootdir sector was then off-by-one. bizzare...
-		//	dirinfo->currentcluster = 0;
-		//	dirinfo->currentsector = 0;
-		//	dirinfo->currententry = 0;
-		//
-		//	// read first sector of directory
-		//	return DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1);
-		//}
 	}
 
 	// This is not the root directory. We need to find the start of this subdirectory.
@@ -556,7 +560,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->dataarea + ((volinfo->rootdir - 2) * volinfo->secperclus), 1))
 				return DFS_ERRMISC;
 		}
-		else { //if (volinfo->filesystem == FAT16) {
+		else {
 			dirinfo->currentcluster = 0;
 			dirinfo->currentsector = 0;
 			dirinfo->currententry = 0;
@@ -565,15 +569,6 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 			if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1))
 				return DFS_ERRMISC;
 		}
-		//else { //ggn - something fishy is happening here, the original code had the same codepath for fat16+fat12, but the rootdir sector was then off-by-one. bizzare...
-		//	dirinfo->currentcluster = 0;
-		//	dirinfo->currentsector = 0;
-		//	dirinfo->currententry = 0;
-		//
-		//	// read first sector of directory
-		//	if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->rootdir, 1))
-		//		return DFS_ERRMISC;
-		//}
 
 		// skip leading path separators
 		while (*ptr == DIR_SEPARATOR && *ptr)
