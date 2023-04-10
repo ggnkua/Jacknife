@@ -163,7 +163,8 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	if (volinfo->numsecs<1 && volinfo->numsecs>21) // caters for HD floppy drives
 		return DFS_ERRMISC;
 
-	volinfo->reservedsecs = (lbr->bpb.RES_l) | (lbr->bpb.RES_h << 8);
+	// GEMDOS seems to ignore the high byte, so let's not use it as well (for example: ADITalk v2.3.msa)
+	volinfo->reservedsecs = (lbr->bpb.RES_l) /* | (lbr->bpb.RES_h << 8)*/;
 	if (volinfo->reservedsecs > volinfo->numsecs)
 		return DFS_ERRMISC;
 
