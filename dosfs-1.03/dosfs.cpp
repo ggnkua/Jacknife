@@ -184,13 +184,16 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	if (!volinfo->fat1) volinfo->fat1 = 1;	// ggn: GEMDOS specific
 
 	int sides = (lbr->bpb.NSIDES_h << 8) | lbr->bpb.NSIDES_l;
-	if (sides==1 && disk_image.file_size / SECTOR_SIZE / 2 == volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16)
+	int disk_image_sectors = disk_image.file_size / SECTOR_SIZE;
+	int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
+	if (sides == 1 && (disk_image_sectors / 2 == bpb_total_sectors)
+		           || (disk_image_sectors / 2 == volinfo->numsecs))
 	{
-		// ggn: Most likely the image is double sided but the BPB reports 1 side.
-		//      So... trying to access anything other than track 0 side 0 is going to point to garbage.
-		//      There are a few ways to work around this (just don't use images like that would be the obvious one, sheesh!)
-		//		but we'll just inform the disk sector read/write routines about this, so they will adjust the offsets
-		//		behind everyone's back
+		// note: Most likely the image is double sided but the BPB reports 1 side.
+		//       So... trying to access anything other than track 0 side 0 is going to point to garbage.
+		//       There are a few ways to work around this (just don't use images like that would be the obvious one, sheesh!)
+		//		 but we'll just inform the disk sector read/write routines about this, so they will adjust the offsets
+		//		 behind everyone's back.
 		disk_image.use_one_side_only = true;
 		disk_image.sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
 	}
