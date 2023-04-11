@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <cstdlib>
 #include <string.h>
+#include <assert.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -15,9 +16,7 @@
 #define strcpy_s(a,b,c) strcpy(a,c)
 #define fopen_s(a,b,c) fopen(b,c)
 #define _strcmpi strcasecmp
-#define BYTE unsigned char
-#define UINT unsigned int
-#define BOOL bool
+#define BOOL int
 #endif
 
 #include "wcxhead.h"
@@ -31,6 +30,351 @@ stEntryList entryList;
 tArchive* pCurrentArchive;
 
 typedef tArchive* myHANDLE;
+
+DISK_IMAGE_INFO disk_image = { 0 };
+
+//unpack MSA into a newly created buffer
+uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
+	int sectors = ((int)packedMsa[2] << 8) | ((int)packedMsa[3]);
+	int sides = (((int)packedMsa[4] << 8) | ((int)packedMsa[5])) + 1;
+	int startTrack = ((int)packedMsa[6] << 8) | ((int)packedMsa[7]);
+	int endTrack = ((int)packedMsa[8] << 8) | ((int)packedMsa[9]);
+	//just ignore partial disk images, skipping tracks would skip bpb/fat, too
+	if (startTrack != 0 || endTrack == 0) {
+		free(packedMsa);
+		return NULL;
+	}
+	int unpackedSize = sectors * 512 * sides * (endTrack + 1);
+	disk_image.iamge_size = unpackedSize;
+	disk_image.image_sectors = sectors;
+	disk_image.iamge_sides = sides;
+	disk_image.image_tracks = endTrack;
+	uint8_t *unpackedData = (uint8_t *)malloc(unpackedSize);
+	if (!unpackedData) return 0;
+
+	int offset = 10;
+	int out = 0;
+	for (int i = 0; i < (endTrack + 1) * sides; i++) {
+		int trackLen = packedMsa[offset++];
+		trackLen <<= 8;
+		trackLen += packedMsa[offset++];
+		if (trackLen != 512 * sectors) {
+			for (; trackLen > 0; trackLen--) {
+				unpackedData[out++] = packedMsa[offset++];
+				// Bounds check against corrupt MSA images
+				if (out > unpackedSize || offset > packedSize)
+				{
+					free(unpackedData);
+					return 0;
+				}
+				if (unpackedData[out - 1] == 0xe5) {
+					// Bounds check against corrupt MSA images
+					if (offset + 4 - 1 > packedSize)
+					{
+						free(unpackedData);
+						return 0;
+					}
+					uint8_t data = packedMsa[offset++];
+					unsigned int runLen = packedMsa[offset++];
+					runLen <<= 8;
+					runLen += packedMsa[offset++];
+					trackLen -= 3;
+					out--;
+					for (unsigned int ii = 0; ii < runLen && out < unpackedSize; ii++) {
+						unpackedData[out++] = data;
+					}
+				}
+			}
+		}
+		else {
+			// Bounds check against corrupt MSA images
+			if (out + trackLen > unpackedSize || offset + trackLen > packedSize)
+			{
+				free(unpackedData);
+				return 0;
+			}
+			for (; trackLen > 0; trackLen--) {
+				unpackedData[out++] = packedMsa[offset++];
+			}
+		}
+	}
+	return unpackedData;
+}
+
+
+
+bool guess_size(int size)
+{
+	if (size % 512) {
+		return false;
+	}
+	int tracks, sectors;
+	for (tracks = 86; tracks > 0; tracks--) {
+		for (sectors = 11; sectors >= 9; sectors--) {
+			if (!(size % tracks)) {
+				if ((size % (tracks * sectors * 2 * 512)) == 0) {
+					disk_image.image_tracks = tracks;
+					disk_image.iamge_sides = 2;
+					disk_image.image_sectors = sectors;
+					return true;
+				}
+				else if ((size % (tracks * sectors * 1 * 512)) == 0) {
+					disk_image.image_tracks = tracks;
+					disk_image.iamge_sides = 1;
+					disk_image.image_sectors = sectors;
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+
+/*
+	Attach emulation to a host-side disk image file
+	Returns 0 OK, nonzero for any error
+*/
+int DFS_HostAttach(tArchive *arch)
+{
+	disk_image.file_handle = fopen(arch->archname, "r+b");
+	if (disk_image.file_handle == NULL)
+		return -1;
+
+	fseek(disk_image.file_handle, 0, SEEK_END);
+	disk_image.file_size = ftell(disk_image.file_handle);
+	fseek(disk_image.file_handle, 0, SEEK_SET);
+
+	disk_image.cached_into_ram = false;
+	disk_image.disk_geometry_does_not_match_bpb = false;
+	if (disk_image.file_size <= 2880 * 1024)
+	{
+		// Definitely a disk image, let's cache it into RAM
+		disk_image.cached_into_ram = true;
+		disk_image.image_buffer = (uint8_t *)malloc(disk_image.file_size);
+		if (!disk_image.image_buffer) return -1;
+		if (!fread(disk_image.image_buffer, disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
+		fclose(disk_image.file_handle);
+		arch->mode = DISKMODE_LINEAR;
+		if ((disk_image.image_buffer[0] == 0xe && disk_image.image_buffer[1] == 0xf) ||
+			(disk_image.image_buffer[0] == 0x0 && disk_image.image_buffer[1] == 0x0 && strlen(arch->archname) > 4 && _strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0))
+		{
+			arch->mode = DISKMODE_MSA;
+			uint8_t *unpacked_msa = unpack_msa(arch, disk_image.image_buffer, disk_image.file_size);
+			free(disk_image.image_buffer);
+			if (!unpacked_msa)
+			{
+				return -1;
+			}
+			disk_image.image_buffer = unpacked_msa;
+			disk_image.file_size = disk_image.iamge_size;
+		}
+		else
+		{
+			if (!guess_size(disk_image.file_size))
+			{
+				free(disk_image.image_buffer);
+				return -1;
+			}
+		}
+		disk_image.cached_into_ram = true;
+	}
+
+	return 0;	// OK
+}
+
+uint32_t recalculate_sector(uint32_t sector)
+{
+	uint32_t requested_track = sector / disk_image.bpb_sectors_per_track / disk_image.bpb_sides;
+	uint32_t requested_side = (sector % (disk_image.bpb_sectors_per_track * disk_image.bpb_sides)) / disk_image.bpb_sectors_per_track;
+	uint32_t requested_sector = sector % disk_image.bpb_sectors_per_track;
+	return requested_track * disk_image.image_sectors * disk_image.iamge_sides +
+		requested_side * disk_image.image_sectors +
+		requested_sector;
+}
+
+/*
+	Read sector from image
+	Returns 0 OK, nonzero for any error
+*/
+int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
+{
+	if (disk_image.disk_geometry_does_not_match_bpb)
+	{
+		// Wonky disk image detected, let's skip the second side from the image
+		sector = recalculate_sector(sector);
+		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
+	}
+
+	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
+	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
+		return -1;
+
+	if (disk_image.cached_into_ram)
+	{
+		memcpy(buffer, &disk_image.image_buffer[sector * SECTOR_SIZE], SECTOR_SIZE);
+		return 0;
+	}
+	else
+	{
+		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
+			return -1;
+
+		fread(buffer, SECTOR_SIZE, count, disk_image.file_handle);
+		return 0;
+	}
+}
+
+uint32_t DFS_ReadSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t count)
+{
+	return DFS_HostReadSector(buffer, sector, count);
+}
+
+/*
+	Write sector to image
+	Returns 0 OK, nonzero for any error
+*/
+int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
+{
+	if (disk_image.disk_geometry_does_not_match_bpb)
+	{
+		// Wonky disk image detected, let's skip the second side from the image
+		sector = recalculate_sector(sector);
+		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
+	}
+
+	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
+	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
+		return -1;
+
+	if (disk_image.cached_into_ram)
+	{
+		memcpy(&disk_image.image_buffer[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
+		return 0;
+	}
+	else
+	{
+		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
+			return -1;
+
+		fwrite(buffer, SECTOR_SIZE, count, disk_image.file_handle);
+		fflush(disk_image.file_handle);
+		return 0;
+	}
+}
+
+uint32_t DFS_WriteSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t count)
+{
+	return DFS_HostWriteSector(buffer, sector, count);
+}
+
+// try to pack a chunk of data in MSA RLE format
+// returns packed size or -1 if packing was unsuccessful
+static int pack_track(unsigned char *dest, const unsigned char *src, int len) {
+	int pklen = 0;
+	const unsigned char *p = (const unsigned char *)src, *src_end = (const unsigned char *)src + len;
+
+	while (p < src_end) {
+		const unsigned char *prev = p;
+		unsigned int pkv = *p++;
+		while (p < src_end && *p == pkv) p++;
+		int n = (int)(p - prev);
+		if ((n >= 4 || pkv == 0xE5) && pklen + 4 < len) {
+			*dest++ = 0xE5;
+			*dest++ = pkv;
+			*dest++ = n >> 8;
+			*dest++ = n;
+			pklen += 4;
+		}
+		else if (pklen + n < len) {
+			int i;
+			for (i = 0; i < n; ++i) *dest++ = pkv;
+			pklen += n;
+		}
+		else {
+			return -1;
+		}
+	}
+	return pklen;
+}
+
+uint8_t *make_msa(tArchive *arch)
+{
+	// Write MSA header
+	int sectors = disk_image.image_sectors;
+	int sides = disk_image.iamge_sides;
+	int start_track = 0;
+	int end_track = disk_image.image_tracks;
+
+	unsigned char *packed_buffer = (unsigned char *)malloc(10 + end_track * (sectors * SECTOR_SIZE + 2) * sides + 100000); // 10=header size, +2 bytes per track for writing the track size
+	if (!packed_buffer) return 0;
+	unsigned char *pack = packed_buffer;
+
+	memcpy(pack + 0, "\x0e\x0f", 2);
+	*(unsigned short *)(pack + 2) = ((unsigned short)(sectors << 8)) | ((unsigned short)(sectors >> 8));
+	*(unsigned short *)(pack + 4) = ((unsigned short)((sides - 1) << 8)) | ((unsigned short)((sides - 1) >> 8));
+	*(unsigned short *)(pack + 6) = 0; // Start track will always be 0
+	*(unsigned short *)(pack + 8) = ((unsigned short)(end_track << 8)) | ((unsigned short)(end_track >> 8));
+	pack += 10;
+
+	int track;
+	unsigned char *p = disk_image.image_buffer;
+	for (track = 0; track < end_track + 1; ++track) {
+		int side;
+		for (side = 0; side < sides; ++side) {
+			// try to compress the track
+			int pklen = pack_track(pack + 2, p, sectors * 512);
+			if (pklen < 0) {
+				// compression failed, writing uncompressed
+				*(unsigned short *)(pack) = (unsigned short)((sectors * SECTOR_SIZE) >> 8) | (unsigned short)((sectors * SECTOR_SIZE) << 8);
+				memcpy(pack + 2, p, sectors * 512);
+				pack += 2 + SECTOR_SIZE * sectors;
+			}
+			else {
+				// write the compressed data
+				*(unsigned short *)(pack) = (unsigned short)(pklen >> 8) | (unsigned short)(pklen << 8);
+				pack += 2 + pklen;
+			}
+			p += sectors * 512;
+		}
+	}
+	disk_image.file_size = (int)(pack - packed_buffer);
+	return packed_buffer;
+}
+
+int DFS_HostDetach(tArchive *arch)
+{
+	if (disk_image.cached_into_ram)
+	{
+		if (!arch->volume_dirty)
+		{
+			free(disk_image.image_buffer);
+			return 0;
+		}
+		if (arch->mode == DISKMODE_MSA)
+		{
+			uint8_t *packed_msa = make_msa(arch);
+			if (!packed_msa)
+			{
+				free(disk_image.image_buffer);
+				return -1;
+			}
+			free(disk_image.image_buffer);
+			disk_image.image_buffer = packed_msa;
+		}
+		disk_image.file_handle = fopen(arch->archname, "wb");
+		if (!disk_image.file_handle) return -1;
+		fwrite(disk_image.image_buffer, disk_image.file_size, 1, disk_image.file_handle);
+		free(disk_image.image_buffer);
+		fclose(disk_image.file_handle);
+		return 0;
+	}
+	else
+	{
+		if (!disk_image.file_handle) return -1;
+		return fclose(disk_image.file_handle);
+	}
+}
 
 stEntryList* findLastEntry() {
 	stEntryList* entry = &entryList;
@@ -132,74 +476,6 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 	free(scratch_sector);
 
 	return res;
-}
-
-//unpack MSA into a newly created buffer
-BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
-	int sectors		=  ((int)packedMsa[2] << 8) | ((int)packedMsa[3]);
-	int sides		= (((int)packedMsa[4] << 8) | ((int)packedMsa[5])) + 1;
-	int startTrack	=  ((int)packedMsa[6] << 8) | ((int)packedMsa[7]);
-	int endTrack	=  ((int)packedMsa[8] << 8) | ((int)packedMsa[9]);
-	//just ignore partial disk images, skipping tracks would skip bpb/fat, too
-	if (startTrack != 0 || endTrack == 0) {
-		free(packedMsa);
-		return NULL;
-	}
-	int unpackedSize = sectors * 512 * sides * (endTrack + 1);
-	disk_image.iamge_size		= unpackedSize;
-	disk_image.image_sectors	= sectors;
-	disk_image.iamge_sides		= sides;
-	disk_image.image_tracks	= endTrack;
-	BYTE* unpackedData = (BYTE*)malloc(unpackedSize);
-	if (!unpackedData) return 0;
-
-	int offset = 10;
-	int out = 0;
-	for (int i = 0; i < (endTrack + 1) * sides; i++) {
-		int trackLen = packedMsa[offset++];
-		trackLen <<= 8;
-		trackLen += packedMsa[offset++];
-		if (trackLen != 512 * sectors) {
-			for (; trackLen > 0; trackLen--) {
-				unpackedData[out++] = packedMsa[offset++];
-				// Bounds check against corrupt MSA images
-				if (out > unpackedSize || offset > packedSize)
-				{
-					free(unpackedData);
-					return 0;
-				}
-				if (unpackedData[out - 1] == 0xe5) {
-					// Bounds check against corrupt MSA images
-					if (offset + 4 - 1 > packedSize)
-					{
-						free(unpackedData);
-						return 0;
-					}
-					BYTE data = packedMsa[offset++];
-					unsigned int runLen = packedMsa[offset++];
-					runLen <<= 8;
-					runLen += packedMsa[offset++];
-					trackLen -= 3;
-					out--;
-					for (unsigned int ii = 0; ii < runLen && out < unpackedSize; ii++) {
-						unpackedData[out++] = data;
-					}
-				}
-			}
-		}
-		else {
-			// Bounds check against corrupt MSA images
-			if (out + trackLen > unpackedSize || offset + trackLen > packedSize)
-			{
-				free(unpackedData);
-				return 0;
-			}
-			for (; trackLen > 0; trackLen--) {
-				unpackedData[out++] = packedMsa[offset++];
-			}
-		}
-	}
-	return unpackedData;
 }
 
 bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
@@ -339,7 +615,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		unsigned int readLen;
 		unsigned int len;
 		len = fi.filelen;
-		unsigned char *buf = (BYTE *)calloc(1, len + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
+		unsigned char *buf = (uint8_t *)calloc(1, len + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
 		res = DFS_ReadFile(&fi, scratch_sector, buf, &readLen, len);
 		if (res != DFS_OK) {
 			free(buf);
@@ -482,7 +758,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			DFS_HostDetach(&archive_handle);
 			return E_ECREATE;
 		}
-		UINT bytes_written;
+		unsigned int bytes_written;
 		res = DFS_WriteFile(&fi, scratch_sector, read_buf, &bytes_written, file_size);
 		if (res != DFS_OK) {
 			free(read_buf);
