@@ -504,13 +504,20 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	DFS_HostDetach(&archive_handle);
 	if (Flags & PK_PACK_MOVE_FILES)
 	{
-		//LPCSTR *temp_list = (LPCSTR)AddList;
+		LPCSTR delete_list = (LPCSTR)AddList;
 
-		//while (*temp_list)
-		//{
-		//	DeleteFile(temp_list);
-		//	temp_list += strlen(temp_list) + 1;
-		//}
+		while (*delete_list)
+		{
+#ifdef _WIN32
+			if (!DeleteFileA(delete_list))
+#else
+			if (unlink(delete_list)
+#endif
+			{
+				return E_ECLOSE;	// No idea what would be the correct error code
+			}
+			delete_list += strlen(delete_list) + 1;
+		}
 	}
 	return 0; // All ok
 }
