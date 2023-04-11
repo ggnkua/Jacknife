@@ -146,10 +146,10 @@ BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 		return NULL;
 	}
 	int unpackedSize = sectors * 512 * sides * (endTrack + 1);
-	disk_image.unpackedMsaSize		= unpackedSize;
-	disk_image.unpackedMsaSectors	= sectors;
-	disk_image.unpackedMsaSides		= sides;
-	disk_image.unpackedMsaEndTrack	= endTrack;
+	disk_image.iamge_size		= unpackedSize;
+	disk_image.image_sectors	= sectors;
+	disk_image.iamge_sides		= sides;
+	disk_image.image_tracks	= endTrack;
 	BYTE* unpackedData = (BYTE*)malloc(unpackedSize);
 	if (!unpackedData) return 0;
 

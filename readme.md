@@ -16,7 +16,6 @@ This little plugin enables Total Commander to open and extract Atari ST .ST and 
 ### What's missing (but planned)
 
 - Deleting empty folders
-- Opening empty folders is problematic
 - Hard disk image support (with multiple partition support)
 - `.DIM` image support (Fastcopy & E-Copy)
 - Deleting files while adding to image (i.e. "move to archive")

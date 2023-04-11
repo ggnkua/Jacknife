@@ -193,7 +193,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	int disk_image_sectors = disk_image.file_size / SECTOR_SIZE;
 	int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
 	int bpb_sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
-	if ((sides == 1 && disk_image.unpackedMsaSides == 2) || (bpb_sectors_per_track != disk_image.unpackedMsaSectors))
+	if ((sides == 1 && disk_image.iamge_sides == 2) || (bpb_sectors_per_track != disk_image.image_sectors))
 	{
 		// In general, there are cases where the disk has been imaged without taking the BPB under consideration.
 		// So the disk would be imaged with different values (for example 82 instead of 80 tracks, 10 instead of

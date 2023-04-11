@@ -36,15 +36,15 @@ bool guess_size(int size)
 		for (sectors = 11; sectors >= 9; sectors--) {
 			if (!(size % tracks)) {
 				if ((size % (tracks * sectors * 2 * 512)) == 0) {
-					disk_image.unpackedMsaEndTrack	= tracks;
-					disk_image.unpackedMsaSides		= 2;
-					disk_image.unpackedMsaSectors	= sectors;
+					disk_image.image_tracks	= tracks;
+					disk_image.iamge_sides		= 2;
+					disk_image.image_sectors	= sectors;
 					return true;
 				}
 				else if ((size % (tracks * sectors * 1 * 512)) == 0) {
-					disk_image.unpackedMsaEndTrack	= tracks;
-					disk_image.unpackedMsaSides		= 1;
-					disk_image.unpackedMsaSectors	= sectors;
+					disk_image.image_tracks	= tracks;
+					disk_image.iamge_sides		= 1;
+					disk_image.image_sectors	= sectors;
 					return true;
 				}
 			}
@@ -90,7 +90,7 @@ int DFS_HostAttach(tArchive *arch)
 				return -1;
 			}
 			disk_image.image_buffer = unpacked_msa;
-			disk_image.file_size = disk_image.unpackedMsaSize;
+			disk_image.file_size = disk_image.iamge_size;
 		}
 		else
 		{
@@ -111,8 +111,8 @@ uint32_t recalculate_sector(uint32_t sector)
 	uint32_t requested_track = sector / disk_image.bpb_sectors_per_track / disk_image.bpb_sides;
 	uint32_t requested_side = (sector % (disk_image.bpb_sectors_per_track * disk_image.bpb_sides))/ disk_image.bpb_sectors_per_track;
 	uint32_t requested_sector = sector % disk_image.bpb_sectors_per_track;
-	return requested_track * disk_image.unpackedMsaSectors * disk_image.unpackedMsaSides +
-		requested_side * disk_image.unpackedMsaSectors +
+	return requested_track * disk_image.image_sectors * disk_image.iamge_sides +
+		requested_side * disk_image.image_sectors +
 		requested_sector;
 }
 
@@ -224,10 +224,10 @@ static int pack_track(unsigned char *dest, const unsigned char *src, int len) {
 uint8_t *make_msa(tArchive *arch)
 {
 	// Write MSA header
-	int sectors = disk_image.unpackedMsaSectors;
-	int sides = disk_image.unpackedMsaSides;
+	int sectors = disk_image.image_sectors;
+	int sides = disk_image.iamge_sides;
 	int start_track = 0;
-	int end_track = disk_image.unpackedMsaEndTrack;
+	int end_track = disk_image.image_tracks;
 
 	unsigned char *packed_buffer = (unsigned char *)malloc(10 + end_track * (sectors * SECTOR_SIZE + 2) * sides+100000); // 10=header size, +2 bytes per track for writing the track size
 	if (!packed_buffer) return 0;
