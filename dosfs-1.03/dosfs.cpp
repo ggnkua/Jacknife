@@ -175,9 +175,16 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	volinfo->label[0] = 0; // For GEMDOS FAT12 this is a file on disk
 
 	// note: if rootentries is 0, we must be in a FAT32 volume.
-	volinfo->rootentries = (lbr->bpb.NDIRS_l)|(lbr->bpb.SPF_h<<8);
-	if (volinfo->rootentries > 240 || volinfo->rootentries < 16 || volinfo->rootentries % 16 != 0)
+	volinfo->rootentries = (lbr->bpb.NDIRS_l) | (lbr->bpb.SPF_h << 8);
+	if (volinfo->rootentries > 240 || volinfo->rootentries < 16 /* || volinfo->rootentries % 16 != 0*/)
 		return DFS_ERRMISC;
+	if (volinfo->rootentries % 16)
+	{
+		// Some creative disk formatters could actually set this to anything, not just a multiple of 16
+		// (or people just used hex editors for teh lulz). We should quantise the value though because the
+		// calculations below that depend on this will point to trash
+		volinfo->rootentries = (volinfo->rootentries) & 0xfff0;
+	}
 
 	// after extracting raw info we perform some useful precalculations
 	volinfo->fat1 = startsector + volinfo->reservedsecs;
