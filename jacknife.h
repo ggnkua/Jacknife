@@ -34,11 +34,7 @@ typedef struct
 	int mode;
 	FILE* fp;
 	bool volume_dirty;
-	int unpackedMsaSize;
-	int unpackedMsaSectors;
-	int unpackedMsaSides;
-	int unpackedMsaEndTrack;
-	bool pack_msa;
+	bool pack_msa;						// Unused for now, in the future this will be a user setting to enable or disable msa packing
 
 	tChangeVolProc pLocChangeVol;
 	tProcessDataProc pLocProcessData;
@@ -46,12 +42,20 @@ typedef struct
 
 typedef struct DISK_IMAGE_INFO_
 {
-	FILE *file_handle;			// references host-side image file
-	uint8_t *image_buffer;		// Buffer for the above
-	int		file_size;			// Size of the above buffer
-	bool	cached_into_ram;	// Should we just load the whole thing into RAM?
-	bool	use_one_side_only;	// See dosfs.cpp for an explanation why this even exists
-	int		sectors_per_track;	// Only required if the bool above is true
+	FILE	*file_handle;				// references host-side image file
+	uint8_t *image_buffer;				// Buffer for the above
+	int		file_size;					// Size of the above buffer
+	bool	cached_into_ram;			// Should we just load the whole thing into RAM?
+	bool	disk_geometry_does_not_match_bpb;			// See dosfs.cpp for an explanation why this even exists
+	//int		image_sectors_per_track;	// Only required if the bool above is true
+	int		bpb_sectors_per_track;		// Only required if the bool above is true
+	int bpb_sides;
+	int		unpackedMsaSize;
+	int		unpackedMsaSectors;
+	int		unpackedMsaSides;
+	int		unpackedMsaEndTrack;
 } DISK_IMAGE_INFO;
+
+extern DISK_IMAGE_INFO disk_image;
 
 #endif

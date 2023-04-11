@@ -25,6 +25,35 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int PackedSize);
 // Globals
 DISK_IMAGE_INFO disk_image = { 0 };
 
+
+bool guess_size(int size)
+{
+	if (size % 512) {
+		return false;
+	}
+	int tracks, sectors;
+	for (tracks = 86; tracks > 0; tracks--) {
+		for (sectors = 11; sectors >= 9; sectors--) {
+			if (!(size % tracks)) {
+				if ((size % (tracks * sectors * 2 * 512)) == 0) {
+					disk_image.unpackedMsaEndTrack	= tracks;
+					disk_image.unpackedMsaSides		= 2;
+					disk_image.unpackedMsaSectors	= sectors;
+					return true;
+				}
+				else if ((size % (tracks * sectors * 1 * 512)) == 0) {
+					disk_image.unpackedMsaEndTrack	= tracks;
+					disk_image.unpackedMsaSides		= 1;
+					disk_image.unpackedMsaSectors	= sectors;
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+
 /*
 	Attach emulation to a host-side disk image file
 	Returns 0 OK, nonzero for any error
@@ -40,6 +69,7 @@ int DFS_HostAttach(tArchive *arch)
 	fseek(disk_image.file_handle, 0, SEEK_SET);
 
 	disk_image.cached_into_ram = false;
+	disk_image.disk_geometry_does_not_match_bpb = false;
 	if (disk_image.file_size <= 2880 * 1024)
 	{
 		// Definitely a disk image, let's cache it into RAM
@@ -60,13 +90,30 @@ int DFS_HostAttach(tArchive *arch)
 				return -1;
 			}
 			disk_image.image_buffer = unpacked_msa;
-			disk_image.file_size = arch->unpackedMsaSize;
-			//return 0;
+			disk_image.file_size = disk_image.unpackedMsaSize;
+		}
+		else
+		{
+			if (!guess_size(disk_image.file_size))
+			{
+				free(disk_image.image_buffer);
+				return -1;
+			}
 		}
 		disk_image.cached_into_ram = true;
 	}
 
 	return 0;	// OK
+}
+
+uint32_t recalculate_sector(uint32_t sector)
+{
+	uint32_t requested_track = sector / disk_image.bpb_sectors_per_track / disk_image.bpb_sides;
+	uint32_t requested_side = (sector % (disk_image.bpb_sectors_per_track * disk_image.bpb_sides))/ disk_image.bpb_sectors_per_track;
+	uint32_t requested_sector = sector % disk_image.bpb_sectors_per_track;
+	return requested_track * disk_image.unpackedMsaSectors * disk_image.unpackedMsaSides +
+		requested_side * disk_image.unpackedMsaSectors +
+		requested_sector;
 }
 
 /*
@@ -75,11 +122,11 @@ int DFS_HostAttach(tArchive *arch)
 */
 int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 {
-	if (disk_image.use_one_side_only)
+	if (disk_image.disk_geometry_does_not_match_bpb)
 	{
 		// Wonky disk image detected, let's skip the second side from the image
+		sector = recalculate_sector(sector);
 		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
-		sector = (sector / disk_image.sectors_per_track) * (disk_image.sectors_per_track * 2) + sector % disk_image.sectors_per_track;
 	}
 
 	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
@@ -112,11 +159,11 @@ uint32_t DFS_ReadSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t
 */
 int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 {
-	if (disk_image.use_one_side_only)
+	if (disk_image.disk_geometry_does_not_match_bpb)
 	{
 		// Wonky disk image detected, let's skip the second side from the image
+		sector = recalculate_sector(sector);
 		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
-		sector = (sector / disk_image.sectors_per_track) * (disk_image.sectors_per_track * 2) + sector % disk_image.sectors_per_track;
 	}
 
 	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
@@ -177,10 +224,10 @@ static int pack_track(unsigned char *dest, const unsigned char *src, int len) {
 uint8_t *make_msa(tArchive *arch)
 {
 	// Write MSA header
-	int sectors = arch->unpackedMsaSectors;
-	int sides = arch->unpackedMsaSides;
+	int sectors = disk_image.unpackedMsaSectors;
+	int sides = disk_image.unpackedMsaSides;
 	int start_track = 0;
-	int end_track = arch->unpackedMsaEndTrack;
+	int end_track = disk_image.unpackedMsaEndTrack;
 
 	unsigned char *packed_buffer = (unsigned char *)malloc(10 + end_track * (sectors * SECTOR_SIZE + 2) * sides+100000); // 10=header size, +2 bytes per track for writing the track size
 	if (!packed_buffer) return 0;

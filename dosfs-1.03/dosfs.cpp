@@ -18,7 +18,6 @@
 
 #include <stdio.h>
 #include "../jacknife.h"
-extern DISK_IMAGE_INFO disk_image;
 
 /*
 	Get starting sector# of specified partition on drive #unit
@@ -193,16 +192,18 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	int sides = (lbr->bpb.NSIDES_h << 8) | lbr->bpb.NSIDES_l;
 	int disk_image_sectors = disk_image.file_size / SECTOR_SIZE;
 	int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
-	if (sides == 1 && (disk_image_sectors / 2 == bpb_total_sectors)
-		           || (disk_image_sectors / 2 == volinfo->numsecs))
+	int bpb_sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
+	if ((sides == 1 && disk_image.unpackedMsaSides == 2) || (bpb_sectors_per_track != disk_image.unpackedMsaSectors))
 	{
-		// note: Most likely the image is double sided but the BPB reports 1 side.
-		//       So... trying to access anything other than track 0 side 0 is going to point to garbage.
-		//       There are a few ways to work around this (just don't use images like that would be the obvious one, sheesh!)
-		//		 but we'll just inform the disk sector read/write routines about this, so they will adjust the offsets
-		//		 behind everyone's back.
-		disk_image.use_one_side_only = true;
-		disk_image.sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
+		// In general, there are cases where the disk has been imaged without taking the BPB under consideration.
+		// So the disk would be imaged with different values (for example 82 instead of 80 tracks, 10 instead of
+		// 9 sectors... you name it). So if we detect this, we have to recalculate the sector offsets. This is done
+		// in recalculate_sector(), but it needs to know the imaged disk geometry, as well as the BPB disk geometry.
+		// So we need to fill in as much info as we can here, and the rest is done during disk image read.
+		// For MSA images it's easy, for .ST images we just have to do our best to guess the disk geometry from file size.
+		disk_image.disk_geometry_does_not_match_bpb = true;
+		disk_image.bpb_sectors_per_track = bpb_sectors_per_track;
+		disk_image.bpb_sides = sides;
 	}
 
 	volinfo->rootdir = volinfo->fat1 + (volinfo->secperfat * 2);
