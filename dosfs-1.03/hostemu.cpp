@@ -101,6 +101,11 @@ int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 	}
 }
 
+uint32_t DFS_ReadSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t count)
+{
+	return DFS_HostReadSector(buffer, sector, count);
+}
+
 /*
 	Write sector to image
 	Returns 0 OK, nonzero for any error
@@ -132,6 +137,11 @@ int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 		fflush(disk_image.file_handle);
 		return 0;
 	}
+}
+
+uint32_t DFS_WriteSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t count)
+{
+	return DFS_HostWriteSector(buffer, sector, count);
 }
 
 // try to pack a chunk of data in MSA RLE format

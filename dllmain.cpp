@@ -22,19 +22,9 @@
 
 #include "wcxhead.h"
 
-#define ATARI_ST_BPB
 #include "dosfs-1.03/dosfs.h"
 #include "dosfs-1.03/hostemu.h"
 #include "jacknife.h"
-
-uint32_t DFS_ReadSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t count)
-{
-	return DFS_HostReadSector(buffer, sector, count);
-}
-uint32_t DFS_WriteSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t count)
-{
-	return DFS_HostWriteSector(buffer, sector, count);
-}
 
 stEntryList entryList;
 
@@ -146,20 +136,20 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 
 //unpack MSA into a newly created buffer
 BYTE* unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
-	int sectors = ((int)packedMsa[2] << 8) | ((int)packedMsa[3]);
-	int sides = (((int)packedMsa[4] << 8) | ((int)packedMsa[5])) + 1;
-	int startTrack = ((int)packedMsa[6] << 8) | ((int)packedMsa[7]);
-	int endTrack = ((int)packedMsa[8] << 8) | ((int)packedMsa[9]);
+	int sectors		=  ((int)packedMsa[2] << 8) | ((int)packedMsa[3]);
+	int sides		= (((int)packedMsa[4] << 8) | ((int)packedMsa[5])) + 1;
+	int startTrack	=  ((int)packedMsa[6] << 8) | ((int)packedMsa[7]);
+	int endTrack	=  ((int)packedMsa[8] << 8) | ((int)packedMsa[9]);
 	//just ignore partial disk images, skipping tracks would skip bpb/fat, too
 	if (startTrack != 0 || endTrack == 0) {
 		free(packedMsa);
 		return NULL;
 	}
 	int unpackedSize = sectors * 512 * sides * (endTrack + 1);
-	arch->unpackedMsaSize = unpackedSize;
-	arch->unpackedMsaSectors = sectors;
-	arch->unpackedMsaSides = sides;
-	arch->unpackedMsaEndTrack = endTrack;
+	disk_image.unpackedMsaSize		= unpackedSize;
+	disk_image.unpackedMsaSectors	= sectors;
+	disk_image.unpackedMsaSides		= sides;
+	disk_image.unpackedMsaEndTrack	= endTrack;
 	BYTE* unpackedData = (BYTE*)malloc(unpackedSize);
 	if (!unpackedData) return 0;
 

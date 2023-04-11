@@ -1,6 +1,6 @@
 // File renamed to .cpp to address the craziness of mixing C and C++
 #define _CRT_SECURE_NO_WARNINGS
-#define ATARI_ST_BPB
+
 /*
 	DOSFS Embedded FAT-Compatible Filesystem
 	(C) 2005 Lewin A.R.W. Edwards (sysadm@zws.com)
@@ -73,11 +73,11 @@ uint32_t DFS_GetPtnStart(uint8_t unit, uint8_t *scratchsector, uint8_t pnum, uin
 */
 uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsector, PVOLINFO volinfo)
 {
-	PLBR lbr = (PLBR) scratchsector;
+	PLBR lbr = (PLBR)scratchsector;
 	volinfo->unit = unit;
 	volinfo->startsector = startsector;
 
-	if(DFS_ReadSector(unit,scratchsector,startsector,1))
+	if (DFS_ReadSector(unit, scratchsector, startsector, 1))
 		return DFS_ERRMISC;
 
 #if !defined(ATARI_ST_BPB)
@@ -119,10 +119,10 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	else {
 		memcpy(volinfo->label, lbr->ebpb.ebpb.label, 11);
 		volinfo->label[11] = 0;
-	
-// tag: OEMID, refer dosfs.h
-//		memcpy(volinfo->system, lbr->ebpb.ebpb.system, 8);
-//		volinfo->system[8] = 0; 
+
+		// tag: OEMID, refer dosfs.h
+		//		memcpy(volinfo->system, lbr->ebpb.ebpb.system, 8);
+		//		volinfo->system[8] = 0; 
 	}
 
 	// note: if rootentries is 0, we must be in a FAT32 volume.
@@ -156,11 +156,11 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 		return DFS_ERRMISC;
 
 	int bytes_per_sector = (lbr->bpb.BPS_h << 8) | lbr->bpb.BPS_l;
-	if (bytes_per_sector !=128 && bytes_per_sector !=256 && bytes_per_sector !=512 && bytes_per_sector !=1024)
+	if (bytes_per_sector != 128 && bytes_per_sector != 256 && bytes_per_sector != 512 && bytes_per_sector != 1024)
 		return DFS_ERRMISC;
 
-	volinfo->numsecs = (lbr->bpb.NSECTS_l)|(lbr->bpb.NSECTS_h<<8);
-	if (volinfo->numsecs<1 && volinfo->numsecs>21) // caters for HD floppy drives
+	volinfo->numsecs = (lbr->bpb.NSECTS_l) | (lbr->bpb.NSECTS_h << 8);
+	if (volinfo->numsecs < 1 && volinfo->numsecs>21) // caters for HD floppy drives
 		return DFS_ERRMISC;
 
 	// GEMDOS seems to ignore the high byte, so let's not use it as well (for example: ADITalk v2.3.msa)
@@ -168,8 +168,8 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	if (volinfo->reservedsecs > volinfo->numsecs)
 		return DFS_ERRMISC;
 
-	volinfo->secperfat = (lbr->bpb.SPF_l)|(lbr->bpb.SPF_h<<8);
-	if (volinfo->secperfat>16) // random guess
+	volinfo->secperfat = (lbr->bpb.SPF_l) | (lbr->bpb.SPF_h << 8);
+	if (volinfo->secperfat > 16) // random guess
 		return DFS_ERRMISC;
 
 	volinfo->label[0] = 0; // For GEMDOS FAT12 this is a file on disk
@@ -603,7 +603,6 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 				else { // ggn - FAT12
 					dirinfo->currentcluster = (uint32_t)de.startclus_l_l |
 						((uint32_t)de.startclus_l_h&0xf) << 8;
-					//volinfo->dataarea++;	// really not sure if this compensation is correct, but it seems to cure the off-by-one sector calculation below
 				}
 
 				dirinfo->currentsector = 0;

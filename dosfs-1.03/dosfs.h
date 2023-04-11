@@ -1,3 +1,6 @@
+#define ATARI_ST_BPB
+
+
 /*
 	DOSFS Embedded FAT-Compatible Filesystem
 	(C) 2005 Lewin A.R.W. Edwards (sysadm@zws.com)
