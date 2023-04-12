@@ -129,6 +129,85 @@ bool guess_size(int size)
 	return false;
 }
 
+#define BYTE_SWAP(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
+
+unsigned char *expand_dim(bool fastcopy_header)
+{ 
+	unsigned char *buf = (unsigned char *)malloc(disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides * 512);
+	unsigned char *d = buf;
+	if (!d) return 0;
+	unsigned char *s = disk_image.buffer;
+
+	FCOPY_HEADER *h = (FCOPY_HEADER * )s;
+	s += 32;
+
+	int total_filesystem_sectors = BYTE_SWAP(h->total_filesystem_sectors);
+	int bytes_left = disk_image.file_size - total_filesystem_sectors * 512;
+	if (fastcopy_header)
+		bytes_left -= 32;
+
+	memcpy(d, s, total_filesystem_sectors * 512);
+	s += total_filesystem_sectors * 512;
+	d += total_filesystem_sectors * 512;
+
+	unsigned char *fat1 = disk_image.buffer + 512+32 + 3; // A bit hardcoded, but eh
+	int cluster_size = BYTE_SWAP(h->cluster_size);
+
+	for (int i = 0; i < BYTE_SWAP(h->total_clusters) / 2; i++)
+	{
+		// Check "even" entry in a FAT12 record
+		int fat_entry = ((fat1[1] & 0xf) << 8) | fat1[0];
+		if (fat_entry == 0 || (fat_entry >= 0xff0 && fat_entry <= 0xff7) ||bytes_left<=0)
+		{
+			memset(d, 0, 512);
+			d += cluster_size;
+		}
+		else
+		{
+			if (bytes_left >= cluster_size)
+			{
+				memcpy(d, s, cluster_size);
+			}
+			else
+			{
+				// Yes, there are .dim files that are truncated at the end
+				memcpy(d, s, bytes_left);
+				memset(d + bytes_left, 0, cluster_size - bytes_left);
+			}
+			s += cluster_size;
+			d += cluster_size;
+			bytes_left -= cluster_size;
+		}
+
+		// Check "odd" entry in a FAT12 record
+		fat_entry = (fat1[2] << 4) | (fat1[1] >> 4);
+		if (fat_entry == 0 || (fat_entry >= 0xff0 && fat_entry <= 0xff7) || bytes_left <= 0)
+		{
+			memset(d, 0, 512);
+			d += cluster_size;
+		}
+		else
+		{
+			if (bytes_left >= cluster_size)
+			{
+				memcpy(d, s, cluster_size);
+			}
+			else
+			{
+				// Yes, there are .dim files that are truncated at the end
+				memcpy(d, s, bytes_left);
+				memset(d + bytes_left, 0, cluster_size - bytes_left);
+			}
+			s += cluster_size;
+			d += cluster_size;
+			bytes_left -= cluster_size;
+		}
+
+		fat1 += 3;
+	}
+
+	return buf; 
+}
 
 /*
 	Attach emulation to a host-side disk image file
@@ -167,6 +246,45 @@ int DFS_HostAttach(tArchive *arch)
 				return -1;
 			}
 			disk_image.buffer = unpacked_msa;
+		}
+		else if (*(unsigned short *)disk_image.buffer == 0x4242)
+		{
+			// Fastcopy DIM image, unpack it to flat buffer
+			FCOPY_HEADER *h = (FCOPY_HEADER *)disk_image.buffer;
+			if (h->start_track)
+			{
+				// Nope, we don't support partial images
+				return -1;
+			}
+			if (h->disk_configuration_present)
+			{
+				disk_image.image_sectors	= h->sectors;
+				disk_image.image_sides		= h->sides + 1;
+				disk_image.image_tracks		= h->end_track + 1;
+				if (h->get_sectors)
+				{
+					// Disk was imaged with "Get sectors" on, so we need to 
+					// expand the image to fill in the non-imaged sectors with blanks
+					arch->mode = DISKMODE_FCOPY_CONF_USED_SECTORS;
+					uint8_t *expanded = expand_dim(true);
+					if (!expanded)
+					{
+						return -1;
+					}
+					disk_image.buffer = expanded;
+				}
+				else
+				{
+					// No problem, just skip past the FCopy header and treat it as a normal .ST disk
+					arch->mode = DISKMODE_FCOPY_CONF_ALL_SECTORS;
+					disk_image.buffer += 32;
+				}
+			}
+			else
+			{
+				arch->mode = DISKMODE_FCOPY_NO_CONF;
+				disk_image.buffer += 32;
+			}
 		}
 		else
 		{
@@ -893,7 +1011,8 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 	//we simply can't check .ST files by contents, so fake checking it by actually opening it
 	//do the same for .MSA for good measure
 	if ((strlen(FileName) > 3 && _strcmpi(FileName + strlen(FileName) - 3, ".st") == 0) || 
-		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".msa") == 0)) {
+		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".msa") == 0) ||
+		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".dim") == 0)) {
 		tOpenArchiveData oad;
 		oad.ArcName = FileName;
 		tArchive* pa = Open(&oad);

@@ -6,15 +6,11 @@
 #define __stdcall
 #endif
 
-#define DISKMODE_LINEAR 0
-#define DISKMODE_MSA 1
-
-// TODO: copypasta from wxchead.h, fix include ordering in hostemu.cpp or move entire file to dllmain.cpp
-/* Definition of callback functions called by the DLL
-Ask to swap disk for multi-volume archive */
-typedef int(__stdcall *tChangeVolProc)(char *ArcName, int Mode);
-/* Notify that data is processed - used for progress dialog */
-typedef int(__stdcall *tProcessDataProc)(char *FileName, int Size);
+#define DISKMODE_LINEAR						0
+#define DISKMODE_MSA						1
+#define DISKMODE_FCOPY_CONF_ALL_SECTORS		2
+#define DISKMODE_FCOPY_CONF_USED_SECTORS	3
+#define DISKMODE_FCOPY_NO_CONF				4
 
 typedef struct stEntryList
 {
@@ -53,6 +49,26 @@ typedef struct DISK_IMAGE_INFO_
 	int		image_sides;				// Derived value from image
 	int		image_tracks;				// Derived value from image
 } DISK_IMAGE_INFO;
+
+typedef struct FCOPY_HEADER_
+{
+	unsigned short magic_value;
+	unsigned char  disk_configuration_present;	// 0=no, non zero=yes
+	unsigned char  get_sectors;					// 0=all sectors, non zero=used sectors only
+	unsigned short unknown;
+	unsigned short sides;
+	unsigned short sectors;
+	unsigned short start_track;
+	unsigned short end_track;
+	unsigned short sector_size;
+	unsigned short sectors_per_cluster;
+	unsigned short cluster_size;
+	unsigned short root_size;
+	unsigned short fat1_size;
+	unsigned short fat_plus_boot_size;
+	unsigned short total_filesystem_sectors;
+	unsigned short total_clusters;
+} FCOPY_HEADER;
 
 extern DISK_IMAGE_INFO disk_image;
 
