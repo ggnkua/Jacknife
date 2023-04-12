@@ -45,9 +45,8 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 		return NULL;
 	}
 	int unpackedSize = sectors * 512 * sides * (endTrack + 1);
-	disk_image.iamge_size = unpackedSize;
 	disk_image.image_sectors = sectors;
-	disk_image.iamge_sides = sides;
+	disk_image.image_sides = sides;
 	disk_image.image_tracks = endTrack;
 	uint8_t *unpackedData = (uint8_t *)malloc(unpackedSize);
 	if (!unpackedData) return 0;
@@ -114,13 +113,13 @@ bool guess_size(int size)
 			if (!(size % tracks)) {
 				if ((size % (tracks * sectors * 2 * 512)) == 0) {
 					disk_image.image_tracks = tracks;
-					disk_image.iamge_sides = 2;
+					disk_image.image_sides = 2;
 					disk_image.image_sectors = sectors;
 					return true;
 				}
 				else if ((size % (tracks * sectors * 1 * 512)) == 0) {
 					disk_image.image_tracks = tracks;
-					disk_image.iamge_sides = 1;
+					disk_image.image_sides = 1;
 					disk_image.image_sectors = sectors;
 					return true;
 				}
@@ -151,29 +150,29 @@ int DFS_HostAttach(tArchive *arch)
 	{
 		// Definitely a disk image, let's cache it into RAM
 		disk_image.cached_into_ram = true;
-		disk_image.image_buffer = (uint8_t *)malloc(disk_image.file_size);
-		if (!disk_image.image_buffer) return -1;
-		if (!fread(disk_image.image_buffer, disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
+		disk_image.buffer = (uint8_t *)malloc(disk_image.file_size);
+		if (!disk_image.buffer) return -1;
+		if (!fread(disk_image.buffer, disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
 		fclose(disk_image.file_handle);
 		arch->mode = DISKMODE_LINEAR;
-		if ((disk_image.image_buffer[0] == 0xe && disk_image.image_buffer[1] == 0xf) ||
-			(disk_image.image_buffer[0] == 0x0 && disk_image.image_buffer[1] == 0x0 && strlen(arch->archname) > 4 && _strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0))
+		if ((disk_image.buffer[0] == 0xe && disk_image.buffer[1] == 0xf) ||
+			(disk_image.buffer[0] == 0x0 && disk_image.buffer[1] == 0x0 && strlen(arch->archname) > 4 && _strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0))
 		{
+			// MSA image, unpack it to a flat buffer
 			arch->mode = DISKMODE_MSA;
-			uint8_t *unpacked_msa = unpack_msa(arch, disk_image.image_buffer, disk_image.file_size);
-			free(disk_image.image_buffer);
+			uint8_t *unpacked_msa = unpack_msa(arch, disk_image.buffer, disk_image.file_size);
+			free(disk_image.buffer);
 			if (!unpacked_msa)
 			{
 				return -1;
 			}
-			disk_image.image_buffer = unpacked_msa;
-			disk_image.file_size = disk_image.iamge_size;
+			disk_image.buffer = unpacked_msa;
 		}
 		else
 		{
 			if (!guess_size(disk_image.file_size))
 			{
-				free(disk_image.image_buffer);
+				free(disk_image.buffer);
 				return -1;
 			}
 		}
@@ -188,7 +187,7 @@ uint32_t recalculate_sector(uint32_t sector)
 	uint32_t requested_track = sector / disk_image.bpb_sectors_per_track / disk_image.bpb_sides;
 	uint32_t requested_side = (sector % (disk_image.bpb_sectors_per_track * disk_image.bpb_sides)) / disk_image.bpb_sectors_per_track;
 	uint32_t requested_sector = sector % disk_image.bpb_sectors_per_track;
-	return requested_track * disk_image.image_sectors * disk_image.iamge_sides +
+	return requested_track * disk_image.image_sectors * disk_image.image_sides +
 		requested_side * disk_image.image_sectors +
 		requested_sector;
 }
@@ -212,7 +211,7 @@ int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 
 	if (disk_image.cached_into_ram)
 	{
-		memcpy(buffer, &disk_image.image_buffer[sector * SECTOR_SIZE], SECTOR_SIZE);
+		memcpy(buffer, &disk_image.buffer[sector * SECTOR_SIZE], SECTOR_SIZE);
 		return 0;
 	}
 	else
@@ -249,7 +248,7 @@ int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 
 	if (disk_image.cached_into_ram)
 	{
-		memcpy(&disk_image.image_buffer[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
+		memcpy(&disk_image.buffer[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
 		return 0;
 	}
 	else
@@ -302,7 +301,7 @@ uint8_t *make_msa(tArchive *arch)
 {
 	// Write MSA header
 	int sectors = disk_image.image_sectors;
-	int sides = disk_image.iamge_sides;
+	int sides = disk_image.image_sides;
 	int start_track = 0;
 	int end_track = disk_image.image_tracks;
 
@@ -318,7 +317,7 @@ uint8_t *make_msa(tArchive *arch)
 	pack += 10;
 
 	int track;
-	unsigned char *p = disk_image.image_buffer;
+	unsigned char *p = disk_image.buffer;
 	for (track = 0; track < end_track + 1; ++track) {
 		int side;
 		for (side = 0; side < sides; ++side) {
@@ -348,7 +347,7 @@ int DFS_HostDetach(tArchive *arch)
 	{
 		if (!arch->volume_dirty)
 		{
-			free(disk_image.image_buffer);
+			free(disk_image.buffer);
 			return 0;
 		}
 		if (arch->mode == DISKMODE_MSA)
@@ -356,16 +355,16 @@ int DFS_HostDetach(tArchive *arch)
 			uint8_t *packed_msa = make_msa(arch);
 			if (!packed_msa)
 			{
-				free(disk_image.image_buffer);
+				free(disk_image.buffer);
 				return -1;
 			}
-			free(disk_image.image_buffer);
-			disk_image.image_buffer = packed_msa;
+			free(disk_image.buffer);
+			disk_image.buffer = packed_msa;
 		}
 		disk_image.file_handle = fopen(arch->archname, "wb");
 		if (!disk_image.file_handle) return -1;
-		fwrite(disk_image.image_buffer, disk_image.file_size, 1, disk_image.file_handle);
-		free(disk_image.image_buffer);
+		fwrite(disk_image.buffer, disk_image.file_size, 1, disk_image.file_handle);
+		free(disk_image.buffer);
 		fclose(disk_image.file_handle);
 		return 0;
 	}

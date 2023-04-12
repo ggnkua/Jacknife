@@ -43,15 +43,14 @@ typedef struct
 typedef struct DISK_IMAGE_INFO_
 {
 	FILE	*file_handle;				// references host-side image file
-	uint8_t *image_buffer;				// Buffer for the above
+	uint8_t *buffer;					// Buffer for the above
 	int		file_size;					// Size of the above buffer
 	bool	cached_into_ram;			// Should we just load the whole thing into RAM?
 	bool	disk_geometry_does_not_match_bpb;			// See dosfs.cpp for an explanation why this even exists
 	int		bpb_sectors_per_track;		// Only required if the bool above is true
 	int		bpb_sides;					// Same
-	int		iamge_size;					// Derived value from image
 	int		image_sectors;				// Derived value from image
-	int		iamge_sides;				// Derived value from image
+	int		image_sides;				// Derived value from image
 	int		image_tracks;				// Derived value from image
 } DISK_IMAGE_INFO;
 
