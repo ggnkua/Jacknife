@@ -463,6 +463,10 @@ int DFS_HostDetach(tArchive *arch)
 {
 	if (disk_image.cached_into_ram)
 	{
+		if (arch->mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || arch->mode == DISKMODE_FCOPY_NO_CONF)
+		{
+			disk_image.buffer -= 32;
+		}
 		if (!arch->volume_dirty)
 		{
 			free(disk_image.buffer);
@@ -722,6 +726,14 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	uint8_t scratch_sector[SECTOR_SIZE];
 	if (Operation == PK_SKIP || Operation == PK_TEST) return 0;
 	tArchive *arch = hArcData;
+
+	// TODO: This is here for now to disallow people from messing up .DIM images.
+	//       It will go away eventually once we implement .DIM creation
+	if (arch->mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || arch->mode == DISKMODE_FCOPY_NO_CONF || arch->mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
+	{
+		return E_NOT_SUPPORTED;
+	}
+
 	if (Operation == PK_EXTRACT && arch->lastEntry != NULL) {
 		uint32_t res;
 		FILEINFO fi;
