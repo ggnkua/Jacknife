@@ -1,6 +1,9 @@
 // File renamed to .cpp to address the craziness of mixing C and C++
 #define _CRT_SECURE_NO_WARNINGS
 #include "../wcxhead.h"
+#ifndef _WIN32
+#define __stdcall	// needed for wcxhead.h
+#endif
 
 /*
 	DOSFS Embedded FAT-Compatible Filesystem
@@ -14,10 +17,8 @@
 
 #include <string.h>
 #include <stdlib.h>
-
-#include "dosfs.h"
-
 #include <stdio.h>
+#include "dosfs.h"
 #include "../jacknife.h"
 
 /*

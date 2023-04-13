@@ -11,6 +11,7 @@
 #include <windows.h>
 #define PATH_SEPERATOR "\\"
 #else
+#include <unistd.h>
 #define PATH_SEPERATOR "/"
 #define __stdcall
 #define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
@@ -18,6 +19,7 @@
 #define fopen_s(a,b,c) fopen(b,c)
 #define _strcmpi strcasecmp
 #define BOOL int
+typedef char *LPCSTR;
 #endif
 
 #include "wcxhead.h"
@@ -926,7 +928,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 #ifdef _WIN32
 			if (!DeleteFileA(delete_list))
 #else
-			if (unlink(delete_list)
+			if (unlink(delete_list))
 #endif
 			{
 				return E_ECLOSE;	// No idea what would be the correct error code
@@ -977,6 +979,12 @@ int Delete(char *PackedFile, char *DeleteList)
 
 	return 0; // All ok
 }
+
+#ifndef _WIN32
+extern "C"
+{
+#endif
+
 // OpenArchive should perform all necessary operations when an archive is to be opened
 myHANDLE __stdcall OpenArchive(tOpenArchiveData* ArchiveData)
 {
@@ -1049,6 +1057,10 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 	}
 	return false;
 }
+
+#ifndef _WIN32
+}
+#endif
 
 #ifdef _WIN32
 // The DLL entry point
