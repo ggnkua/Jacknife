@@ -20,6 +20,7 @@
 #define _strcmpi strcasecmp
 #define BOOL int
 typedef char *LPCSTR;
+#define _stat stat
 #endif
 
 #include "wcxhead.h"
