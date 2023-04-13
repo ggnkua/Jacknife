@@ -372,7 +372,7 @@ uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent);
 	Returns various DFS_* error states. If the result is DFS_OK, fileinfo can be used
 	to access the file from this point on.
 */
-uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *scratch, PFILEINFO fileinfo);
+uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *scratch, PFILEINFO fileinfo, uint32_t filedatetime);
 
 /*
 	Read an open file

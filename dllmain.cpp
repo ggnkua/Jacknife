@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <string.h>
 #include <assert.h>
+#include <sys/stat.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -740,7 +741,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	if (Operation == PK_EXTRACT && arch->lastEntry != NULL) {
 		uint32_t res;
 		FILEINFO fi;
-		res = DFS_OpenFile(&arch->vi, (uint8_t *)arch->lastEntry->fileWPath, DFS_READ, scratch_sector, &fi);
+		res = DFS_OpenFile(&arch->vi, (uint8_t *)arch->lastEntry->fileWPath, DFS_READ, scratch_sector, &fi, 0);
 		if (res != DFS_OK) {
 			return E_EREAD;
 		}
@@ -812,6 +813,7 @@ int Close(tArchive* hArcData)
 	return 0;// ok
 };
 
+#include <time.h>
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
 	if (!AddList || *AddList == 0) return E_NO_FILES;
@@ -861,6 +863,11 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		{
 			return E_NO_FILES;
 		}
+		struct _stat file_stats;
+		_stat(filename_source, &file_stats);
+		struct tm *file_tm;
+		file_tm = localtime(&file_stats.st_mtime);
+		int file_timestamp = ((file_tm->tm_year-80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
 		fseek(handle_to_add, 0, SEEK_END);
 		int file_size = ftell(handle_to_add);
 		if (file_size < 0) {
@@ -884,7 +891,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 		fclose(handle_to_add);
 		strcpy(&filename_dest[1], current_file);
-		res = DFS_OpenFile(&archive_handle.vi, (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi);
+		res = DFS_OpenFile(&archive_handle.vi, (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
 		if (res != DFS_OK) {
 			free(read_buf);
 			DFS_HostDetach(&archive_handle);

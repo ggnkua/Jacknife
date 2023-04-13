@@ -801,8 +801,10 @@ uint32_t DFS_GetFreeDirEnt(PVOLINFO volinfo, uint8_t *path, PDIRINFO di, PDIRENT
 	provide a pointer to a sector-sized scratch buffer.
 	Returns various DFS_* error states. If the result is DFS_OK, fileinfo can be used
 	to access the file from this point on.
+	ggn: if "file_date" is non-zero when opening a file for writing, then its contents
+	     are copied into the appropriate crttime/wrttime struct members.
 */
-uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *scratch, PFILEINFO fileinfo)
+uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *scratch, PFILEINFO fileinfo, uint32_t filedatetime)
 {
 	uint8_t tmppath[MAX_PATH];
 	uint8_t filename[12];
@@ -898,16 +900,30 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 		// put sane values in the directory entry
 		memset(&de, 0, sizeof(de));
 		memcpy(de.name, filename, 11);
-		de.crttime_l = 0x20;	// 01:01:00am, Jan 1, 2006.
-		de.crttime_h = 0x08;
-		de.crtdate_l = 0x11;
-		de.crtdate_h = 0x34;
-		de.lstaccdate_l = 0x11;
-		de.lstaccdate_h = 0x34;
-		de.wrttime_l = 0x20;
-		de.wrttime_h = 0x08;
-		de.wrtdate_l = 0x11;
-		de.wrtdate_h = 0x34;
+		if (filedatetime)
+		{ 
+			de.crtdate_h = (uint8_t)(filedatetime >> 24);
+			de.crtdate_l = (uint8_t)(filedatetime >> 16);
+			de.crttime_h = (uint8_t)(filedatetime >> 8);
+			de.crttime_l = (uint8_t)filedatetime;
+			de.wrtdate_h = (uint8_t)(filedatetime >> 24);
+			de.wrtdate_l = (uint8_t)(filedatetime >> 16);
+			de.wrttime_h = (uint8_t)(filedatetime >> 8);
+			de.wrttime_l = (uint8_t)filedatetime;
+		}
+		else
+		{
+			de.crttime_l = 0x20;	// 01:01:00am, Jan 1, 2006.
+			de.crttime_h = 0x08;
+			de.crtdate_l = 0x11;
+			de.crtdate_h = 0x34;
+			de.lstaccdate_l = 0x11;
+			de.lstaccdate_h = 0x34;
+			de.wrttime_l = 0x20;
+			de.wrttime_h = 0x08;
+			de.wrtdate_l = 0x11;
+			de.wrtdate_h = 0x34;
+		}
 
 		// allocate a starting cluster for the directory entry
 		cluster = DFS_GetFreeFAT(volinfo, scratch);
@@ -1153,7 +1169,7 @@ uint32_t DFS_UnlinkFile(PVOLINFO volinfo, uint8_t *path, uint8_t *scratch)
 	uint32_t tempclus;
 
 	// DFS_OpenFile gives us all the information we need to delete it
-	if (DFS_OK != DFS_OpenFile(volinfo, path, DFS_READ, scratch, &fi))
+	if (DFS_OK != DFS_OpenFile(volinfo, path, DFS_READ, scratch, &fi, 0))
 		return DFS_NOTFOUND;
 
 	// First, read the directory sector and delete that entry
