@@ -12,14 +12,13 @@ This little plugin enables Total Commander to open and extract Atari ST .ST and 
 - Extracting files from images
 - Adding files to images
 - Deleting files from images
+- Deleting source files while adding to image (i.e. "move to archive")
 
 ### What's missing (but planned)
 
 - Deleting empty folders
-- Opening empty folders is problematic
 - Hard disk image support (with multiple partition support)
 - `.DIM` image support (Fastcopy & E-Copy)
-- Deleting files while adding to image (i.e. "move to archive")
 - Support PK_PACK_SAVE_PATHS
 - Some GEMDOS specific quirks need to be addressed
 - More adding/deleting tests

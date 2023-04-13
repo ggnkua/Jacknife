@@ -700,8 +700,11 @@ int NextItem(tArchive* hArcData, tHeaderData* HeaderData)
 	0x20 Archive file
 	*/
 	HeaderData->FileAttr = arch->currentEntry->de.attr;
-	//FileTime = (year - 1980) << 25 | month << 21 | day << 16 | hour << 11 | minute << 5 | second / 2;
-	HeaderData->FileTime = (arch->currentEntry->de.crttime_h << 8) | (arch->currentEntry->de.crttime_h) | (arch->currentEntry->de.crtdate_h << 24) | (arch->currentEntry->de.crtdate_h << 16);
+	// TC format: FileTime = (year - 1980) << 25 | month << 21 | day << 16 | hour << 11 | minute << 5 | second / 2;
+	// FAT entries: 
+	// Date: F E D C B A 9 8 7 6 5 4 3 2 1 0    Time: F E D C B A 9 8 7 6 5 4 3 2 1 0
+	//      | Year        | Month | Day     |        | Hour    | Minute    | Second  |
+	HeaderData->FileTime = (arch->currentEntry->de.wrttime_h << 8) | (arch->currentEntry->de.wrttime_l) | (arch->currentEntry->de.wrtdate_h << 24) | (arch->currentEntry->de.wrtdate_l << 16);
 	HeaderData->PackSize = arch->currentEntry->de.filesize_0 | (arch->currentEntry->de.filesize_1 << 8) | (arch->currentEntry->de.filesize_2 << 16) | (arch->currentEntry->de.filesize_3 << 24);
 	HeaderData->UnpSize = HeaderData->PackSize;
 	HeaderData->CmtBuf = 0;

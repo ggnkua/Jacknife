@@ -9,6 +9,7 @@ This little plugin enables Total Commander to open and extract Atari ST .ST and 
 
 - Opening `.ST` disk images
 - Opening `.MSA` disk iamges
+- `.DIM` image support (Fastcopy & E-Copy)
 - Extracting files from images
 - Adding files to images
 - Deleting files from images
@@ -16,13 +17,13 @@ This little plugin enables Total Commander to open and extract Atari ST .ST and 
 
 ### What's missing (but planned)
 
+- Proper file/date stamps in files written to an image
+- Creating new disk images
 - Deleting empty folders
 - Hard disk image support (with multiple partition support)
-- `.DIM` image support (Fastcopy & E-Copy)
+- Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS
-- Some GEMDOS specific quirks need to be addressed
 - More adding/deleting tests
-- Creating new disk images
 
 ## Installation
 
