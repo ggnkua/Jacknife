@@ -407,7 +407,9 @@ uint32_t DFS_SetFAT(PVOLINFO volinfo, uint8_t *scratch, uint32_t *scratchcache, 
 					}
 					// Even cluster: Low 12 bits being set
 					else {
-						scratch[0] = (scratch[0] & 0xf0) | new_contents & 0x0f;
+						// ggn: original (in comment) was wrong
+						//scratch[0] = (scratch[0] & 0xf0) | new_contents & 0x0f;
+						scratch[0] = (scratch[0] & 0xf0) | (new_contents>>8) & 0x0f;
 					}
 					result = DFS_WriteSector(volinfo->unit, scratch, *scratchcache, 1);
 					// mirror the FAT into copy 2
