@@ -101,6 +101,7 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 			}
 		}
 	}
+	disk_image.file_size = unpackedSize;
 	return unpackedData;
 }
 

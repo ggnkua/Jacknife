@@ -17,7 +17,6 @@ This little plugin enables Total Commander to open and extract Atari ST .ST and 
 
 ### What's missing (but planned)
 
-- Proper file/date stamps in files written to an image
 - Creating new disk images
 - Deleting empty folders
 - Hard disk image support (with multiple partition support)
