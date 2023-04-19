@@ -17,12 +17,14 @@ This little plugin enables Total Commander to open and extract Atari ST .ST and 
 
 ### What's missing (but planned)
 
-- Creating new disk images
+- Creating new disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
 - Deleting empty folders
 - Hard disk image support (with multiple partition support)
 - Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS
 - More adding/deleting tests
+- Standalone command line version for scripting (adding files, deleting files, creating new disk images, extract deleted files -because tIn insisted-, monitoring directory and if it changes sync the differences with the image)
+- Integrating into other programs (for example PiSCSI, zeST etc)
 
 ## Installation
 
@@ -38,3 +40,6 @@ Just open **jacknife_ctrlpagedownonly.zip** in Total Commander and follow the in
 ## Credits
 - FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
 - DOSFS library obtained from http://www.larwe.com/zws/products/dosfs/index.html, modified and debugged (especially for FAT12)
+- Original plugin code by @tin-nl
+- Extended and replaced FAT library by @ggnkua
+- Linux/Mac fix by @tattlemuss

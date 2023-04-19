@@ -81,7 +81,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	if (DFS_ReadSector(unit, scratchsector, startsector, 1))
 		return DFS_ERRMISC;
 
-#if !defined(ATARI_ST_BPB)
+#if !defined(ATARI_ST_SPECIFIC)
 // tag: OEMID, refer dosfs.h
 //	strncpy(volinfo->oemid, lbr->oemid, 8);
 //	volinfo->oemid[8] = 0;
@@ -173,7 +173,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	if (volinfo->secperfat > 16) // random guess
 		return DFS_ERRMISC;
 
-	volinfo->label[0] = 0; // For GEMDOS FAT12 this is a file on disk
+	volinfo->label[0] = 0; // For GEMDOS FAT12 this is a file on the root directory
 
 	// note: if rootentries is 0, we must be in a FAT32 volume.
 	volinfo->rootentries = (lbr->bpb.NDIRS_l) | (lbr->bpb.SPF_h << 8);

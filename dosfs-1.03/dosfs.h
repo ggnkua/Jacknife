@@ -1,4 +1,4 @@
-#define ATARI_ST_BPB
+#define ATARI_ST_SPECIFIC
 
 
 /*
@@ -242,7 +242,7 @@ typedef struct _tagEBPB32 {
 	Logical Boot Record structure (volume boot sector)
 */
 typedef struct _tagLBR {
-#if !defined(ATARI_ST_BPB)
+#if !defined(ATARI_ST_SPECIFIC)
 	uint8_t jump[3];			// JMP instruction
 	uint8_t oemid[8];			// OEM ID, space-padded
 	BPB bpb;					// BIOS Parameter Block
