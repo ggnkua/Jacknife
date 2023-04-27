@@ -6,11 +6,17 @@
 #define __stdcall
 #endif
 
-#define DISKMODE_LINEAR						0
-#define DISKMODE_MSA						1
-#define DISKMODE_FCOPY_CONF_ALL_SECTORS		2
-#define DISKMODE_FCOPY_CONF_USED_SECTORS	3
-#define DISKMODE_FCOPY_NO_CONF				4
+typedef enum {
+	DISKMODE_LINEAR						= 0,
+	DISKMODE_MSA						= 1,
+	DISKMODE_FCOPY_CONF_ALL_SECTORS		= 2,
+	DISKMODE_FCOPY_CONF_USED_SECTORS	= 3,
+	DISKMODE_FCOPY_NO_CONF				= 4,
+	DISKMODE_HARD_DISK					= 5,
+} disk_modes;
+
+#define BYTE_SWAP_LONG(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
+
 
 typedef struct stEntryList
 {
@@ -27,7 +33,6 @@ typedef struct
 	VOLINFO vi;
 	stEntryList* currentEntry;
 	stEntryList* lastEntry;
-	int mode;
 	FILE* fp;
 	bool volume_dirty;
 	bool pack_msa;						// Unused for now, in the future this will be a user setting to enable or disable msa packing
@@ -38,9 +43,10 @@ typedef struct
 
 typedef struct DISK_IMAGE_INFO_
 {
+	disk_modes mode;
 	FILE	*file_handle;				// references host-side image file
 	uint8_t *buffer;					// Buffer for the above
-	int		file_size;					// Size of the above buffer
+	int64_t	file_size;					// Size of the above buffer
 	bool	cached_into_ram;			// Should we just load the whole thing into RAM?
 	bool	disk_geometry_does_not_match_bpb;			// See dosfs.cpp for an explanation why this even exists
 	int		bpb_sectors_per_track;		// Only required if the bool above is true

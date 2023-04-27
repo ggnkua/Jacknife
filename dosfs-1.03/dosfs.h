@@ -136,6 +136,43 @@ typedef struct _tagMBR {
 	uint8_t sig_aa;				// 0xaa signature byte
 } MBR, *PMBR;
 
+#pragma pack(push,1)
+typedef struct AHDI_P_INFO_
+{
+	uint8_t		flg;			// A 1-byle field that indicates the state of a partition. 
+								// Bit 0    When set, the partition exists.
+								//          When not set, the partition does not exist.
+								// Bit1 - 6 These bits are reserved for future use.
+								// Bit 7    When set, the partition is bootable.
+								//          When not set, the partition is not bootable.
+								// The BIOS will boot the first partition that has bit 7 set in this byte. 
+	uint8_t		id[3];			// A 3-byte fieid that identities the partition. The field may contain the three ASCIl characters:
+								// "GEM" - for regular ( < 16Mb) GEMDOS partitions
+								// “BGM" - for big ( >= 16Mb ) GEMDOS partitions
+								// "XGM" - for extended GEMDDS partitions
+	uint32_t	st;				// A 68000 format long word that specifies the ofiset to the beginning of the partition irom the
+								// beginning of the entire hard disk, in number of physical(512 - byte) sectors.
+	uint32_t	siz;			// A 68000 format long word that specifies the size of the partition, in number of physical (512-
+								// byte) sectors.
+} AHDI_P_INFO, *PAHDI_P_INFO;
+
+/*
+	AHDI Root Sector
+*/
+typedef struct _AHDI_RS
+{
+	uint8_t		empty[0x1c2];							
+	uint32_t	hd_siz;			// A 68000 tormat long word that contains the total size of the disk, in number of physical (512-
+								// byte) sectors.
+	AHDI_P_INFO	ptable[4];
+	uint32_t	bsl_st;			// A 68000 format long word that specifies the offset to the beginning of the bad sector list from
+								// the beginning of the entire hard disk, in number of physical (512-byte) sectors. (Typically the
+								// bad sector list will be located at the beginning of the device right after the root sector.)
+	uint32_t	bsl_cnt;		// A 68000 format iong word that specifies the size of the bad sector list, in number of physical
+								// (512-byte) sectors.
+} AHDIRS, *PAHDIRS;
+#pragma pack(pop)
+
 /*
 	BIOS Parameter Block structure (FAT12/16)
 */

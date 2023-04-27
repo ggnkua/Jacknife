@@ -6,6 +6,7 @@
 #include <string.h>
 #include <assert.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -26,7 +27,6 @@ typedef char *LPCSTR;
 #include "wcxhead.h"
 
 #include "dosfs-1.03/dosfs.h"
-#include "dosfs-1.03/hostemu.h"
 #include "jacknife.h"
 
 stEntryList entryList;
@@ -134,7 +134,7 @@ bool guess_size(int size)
 	return false;
 }
 
-#define BYTE_SWAP(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
+#define BYTE_SWAP_WORD(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
 
 unsigned char *expand_dim(bool fastcopy_header)
 { 
@@ -146,8 +146,8 @@ unsigned char *expand_dim(bool fastcopy_header)
 	FCOPY_HEADER *h = (FCOPY_HEADER * )s;
 	s += 32;
 
-	int total_filesystem_sectors = BYTE_SWAP(h->total_filesystem_sectors);
-	int bytes_left = disk_image.file_size - total_filesystem_sectors * 512;
+	int total_filesystem_sectors = BYTE_SWAP_WORD(h->total_filesystem_sectors);
+	int bytes_left = (int)(disk_image.file_size - total_filesystem_sectors * 512);
 	if (fastcopy_header)
 		bytes_left -= 32;
 
@@ -156,9 +156,9 @@ unsigned char *expand_dim(bool fastcopy_header)
 	d += total_filesystem_sectors * 512;
 
 	unsigned char *fat1 = disk_image.buffer + 512+32 + 3; // A bit hardcoded, but eh
-	int cluster_size = BYTE_SWAP(h->cluster_size);
+	int cluster_size = BYTE_SWAP_WORD(h->cluster_size);
 
-	for (int i = 0; i < BYTE_SWAP(h->total_clusters) / 2; i++)
+	for (int i = 0; i < BYTE_SWAP_WORD(h->total_clusters) / 2; i++)
 	{
 		// Check "even" entry in a FAT12 record
 		int fat_entry = ((fat1[1] & 0xf) << 8) | fat1[0];
@@ -225,84 +225,88 @@ int DFS_HostAttach(tArchive *arch)
 		return -1;
 
 	fseek(disk_image.file_handle, 0, SEEK_END);
-	disk_image.file_size = ftell(disk_image.file_handle);
+	disk_image.file_size = _ftelli64(disk_image.file_handle);
 	fseek(disk_image.file_handle, 0, SEEK_SET);
 
 	disk_image.cached_into_ram = false;
 	disk_image.disk_geometry_does_not_match_bpb = false;
-	if (disk_image.file_size <= 2880 * 1024)
+	disk_image.mode = DISKMODE_HARD_DISK;
+
+	if (disk_image.file_size > 2880 * 1024)
 	{
-		// Definitely a disk image, let's cache it into RAM
-		disk_image.cached_into_ram = true;
-		disk_image.buffer = (uint8_t *)malloc(disk_image.file_size);
-		if (!disk_image.buffer) return -1;
-		if (!fread(disk_image.buffer, disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
-		fclose(disk_image.file_handle);
-		arch->mode = DISKMODE_LINEAR;
-		if ((disk_image.buffer[0] == 0xe && disk_image.buffer[1] == 0xf) ||
-			(disk_image.buffer[0] == 0x0 && disk_image.buffer[1] == 0x0 && strlen(arch->archname) > 4 && _strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0))
+		// Hard disk image, that's all we need to do
+		return 0;
+	}
+
+	// Definitely a disk image, let's cache it into RAM
+	disk_image.cached_into_ram = true;
+	disk_image.buffer = (uint8_t *)malloc((size_t)disk_image.file_size);
+	if (!disk_image.buffer) return -1;
+	if (!fread(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
+	fclose(disk_image.file_handle);
+	disk_image.mode = DISKMODE_LINEAR;
+	if ((disk_image.buffer[0] == 0xe && disk_image.buffer[1] == 0xf) ||
+		(disk_image.buffer[0] == 0x0 && disk_image.buffer[1] == 0x0 && strlen(arch->archname) > 4 && _strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0))
+	{
+		// MSA image, unpack it to a flat buffer
+		disk_image.mode = DISKMODE_MSA;
+		uint8_t *unpacked_msa = unpack_msa(arch, disk_image.buffer, (int)disk_image.file_size);
+		free(disk_image.buffer);
+		if (!unpacked_msa)
 		{
-			// MSA image, unpack it to a flat buffer
-			arch->mode = DISKMODE_MSA;
-			uint8_t *unpacked_msa = unpack_msa(arch, disk_image.buffer, disk_image.file_size);
-			free(disk_image.buffer);
-			if (!unpacked_msa)
-			{
-				return -1;
-			}
-			disk_image.buffer = unpacked_msa;
+			return -1;
 		}
-		else if (*(unsigned short *)disk_image.buffer == 0x4242)
+		disk_image.buffer = unpacked_msa;
+	}
+	else if (*(unsigned short *)disk_image.buffer == 0x4242)
+	{
+		// Fastcopy DIM image, unpack it to flat buffer
+		FCOPY_HEADER *h = (FCOPY_HEADER *)disk_image.buffer;
+		if (h->start_track)
 		{
-			// Fastcopy DIM image, unpack it to flat buffer
-			FCOPY_HEADER *h = (FCOPY_HEADER *)disk_image.buffer;
-			if (h->start_track)
+			// Nope, we don't support partial images
+			return -1;
+		}
+		if (h->disk_configuration_present)
+		{
+			disk_image.image_sectors = h->sectors;
+			disk_image.image_sides = h->sides + 1;
+			disk_image.image_tracks = h->end_track + 1;
+			if (h->get_sectors)
 			{
-				// Nope, we don't support partial images
-				return -1;
-			}
-			if (h->disk_configuration_present)
-			{
-				disk_image.image_sectors	= h->sectors;
-				disk_image.image_sides		= h->sides + 1;
-				disk_image.image_tracks		= h->end_track + 1;
-				if (h->get_sectors)
+				// Disk was imaged with "Get sectors" on, so we need to 
+				// expand the image to fill in the non-imaged sectors with blanks
+				disk_image.mode = DISKMODE_FCOPY_CONF_USED_SECTORS;
+				uint8_t *expanded = expand_dim(true);
+				if (!expanded)
 				{
-					// Disk was imaged with "Get sectors" on, so we need to 
-					// expand the image to fill in the non-imaged sectors with blanks
-					arch->mode = DISKMODE_FCOPY_CONF_USED_SECTORS;
-					uint8_t *expanded = expand_dim(true);
-					if (!expanded)
-					{
-						return -1;
-					}
-					disk_image.buffer = expanded;
+					return -1;
 				}
-				else
-				{
-					// No problem, just skip past the FCopy header and treat it as a normal .ST disk
-					arch->mode = DISKMODE_FCOPY_CONF_ALL_SECTORS;
-					disk_image.buffer += 32;
-				}
+				disk_image.buffer = expanded;
 			}
 			else
 			{
-				arch->mode = DISKMODE_FCOPY_NO_CONF;
+				// No problem, just skip past the FCopy header and treat it as a normal .ST disk
+				disk_image.mode = DISKMODE_FCOPY_CONF_ALL_SECTORS;
 				disk_image.buffer += 32;
 			}
 		}
 		else
 		{
-			if (!guess_size(disk_image.file_size))
-			{
-				free(disk_image.buffer);
-				return -1;
-			}
+			disk_image.mode = DISKMODE_FCOPY_NO_CONF;
+			disk_image.buffer += 32;
 		}
-		disk_image.cached_into_ram = true;
 	}
-
-	return 0;	// OK
+	else
+	{
+		if (!guess_size((int)disk_image.file_size))
+		{
+			free(disk_image.buffer);
+			return -1;
+		}
+	}
+	disk_image.cached_into_ram = true;
+	return DFS_OK;
 }
 
 uint32_t recalculate_sector(uint32_t sector)
@@ -468,7 +472,7 @@ int DFS_HostDetach(tArchive *arch)
 {
 	if (disk_image.cached_into_ram)
 	{
-		if (arch->mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || arch->mode == DISKMODE_FCOPY_NO_CONF)
+		if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_NO_CONF)
 		{
 			disk_image.buffer -= 32;
 		}
@@ -477,7 +481,7 @@ int DFS_HostDetach(tArchive *arch)
 			free(disk_image.buffer);
 			return 0;
 		}
-		if (arch->mode == DISKMODE_MSA)
+		if (disk_image.mode == DISKMODE_MSA)
 		{
 			uint8_t *packed_msa = make_msa(arch);
 			if (!packed_msa)
@@ -488,9 +492,18 @@ int DFS_HostDetach(tArchive *arch)
 			free(disk_image.buffer);
 			disk_image.buffer = packed_msa;
 		}
+		if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
+		{
+			// Eventually here we'll just add some code to write a .dim file using "all sectors",
+			// unless someone reeeeeeeeally asks for "used sectors" format it's not happening
+		}
+		if (disk_image.mode == DISKMODE_FCOPY_NO_CONF)
+		{
+			// Unsure if the implementation is different here, it might be merged with the above block
+		}
 		disk_image.file_handle = fopen(arch->archname, "wb");
 		if (!disk_image.file_handle) return -1;
-		fwrite(disk_image.buffer, disk_image.file_size, 1, disk_image.file_handle);
+		fwrite(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle);
 		free(disk_image.buffer);
 		fclose(disk_image.file_handle);
 		return 0;
@@ -619,19 +632,21 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 		//goto error;
 	}
 
-	uint32_t partition_start_sector /*, partition_size*/;
+	uint32_t partition_start_sector, partition_size;
 	uint8_t scratch_sector[SECTOR_SIZE];
-	// Obtain pointer to first partition on first (only) unit
-	// TODO: this will more interesting when we add hard disk image support
-	// for now we'll hardcode all the things
-	// 
-	//pstart = DFS_GetPtnStart(0, sector, 0, &pactive, &ptype, &psize);
-	//if (pstart == 0xffffffff) {
-	// 
-	//	printf("Cannot find first partition\n");
-	//	return -1;
-	//}
 	partition_start_sector = 0;
+	uint8_t pactive, ptype[4];
+
+	// Obtain pointer to first partition on first (only) unit
+	if (disk_image.mode == DISKMODE_HARD_DISK)
+	{
+		partition_start_sector = DFS_GetPtnStart(0, scratch_sector, 0, &pactive, ptype, &partition_size);
+		if (partition_start_sector == 0xffffffff) {
+
+			//printf("Cannot find first partition\n");
+			return false;
+		}
+	}
 
 	if (DFS_GetVolInfo(0, scratch_sector, partition_start_sector, &arch->vi)) {
 		//printf("Error getting volume information\n");
@@ -737,7 +752,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 
 	// TODO: This is here for now to disallow people from messing up .DIM images.
 	//       It will go away eventually once we implement .DIM creation
-	if (arch->mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || arch->mode == DISKMODE_FCOPY_NO_CONF || arch->mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
+	if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_NO_CONF || disk_image.mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
 	{
 		return E_NOT_SUPPORTED;
 	}
@@ -817,7 +832,7 @@ int Close(tArchive* hArcData)
 	return 0;// ok
 };
 
-#include <time.h>
+// TODO: totally reject long filenames for now, as DOSFS is having a really bad time with them
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
 	if (!AddList || *AddList == 0) return E_NO_FILES;
@@ -1044,7 +1059,8 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 	//do the same for .MSA for good measure
 	if ((strlen(FileName) > 3 && _strcmpi(FileName + strlen(FileName) - 3, ".st") == 0) || 
 		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".msa") == 0) ||
-		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".dim") == 0)) {
+		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".dim") == 0) ||
+		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".lol") == 0)) {
 		tOpenArchiveData oad;
 		oad.ArcName = FileName;
 		tArchive* pa = Open(&oad);

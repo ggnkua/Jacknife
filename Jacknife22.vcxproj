@@ -194,7 +194,6 @@ powershell Compress-Archive -Path '$(SolutionDir)install\*.wc*', '$(SolutionDir)
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="dosfs-1.03\dosfs.cpp" />
-    <ClCompile Include="dosfs-1.03\hostemu.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="jacknife.h" />

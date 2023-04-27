@@ -33,7 +33,6 @@
 uint32_t DFS_GetPtnStart(uint8_t unit, uint8_t *scratchsector, uint8_t pnum, uint8_t *pactive, uint8_t *pptype, uint32_t *psize)
 {
 	uint32_t result;
-	PMBR mbr = (PMBR) scratchsector;
 
 	// DOS ptable supports maximum 4 partitions
 	if (pnum > 3)
@@ -43,6 +42,9 @@ uint32_t DFS_GetPtnStart(uint8_t unit, uint8_t *scratchsector, uint8_t pnum, uin
 	if (DFS_ReadSector(unit,scratchsector,0,1)) {
 		return DFS_ERRMISC;
 	}
+
+#ifndef ATARI_ST_SPECIFIC
+	PMBR mbr = (PMBR)scratchsector;
 
 	result = (uint32_t) mbr->ptable[pnum].start_0 |
 	  (((uint32_t) mbr->ptable[pnum].start_1) << 8) |
@@ -62,6 +64,33 @@ uint32_t DFS_GetPtnStart(uint8_t unit, uint8_t *scratchsector, uint8_t pnum, uin
 		  (((uint32_t) mbr->ptable[pnum].size_3) << 24);
 
 	return result;
+#else
+	PAHDIRS rs = (PAHDIRS)scratchsector;
+	int a = offsetof(AHDIRS, hd_siz);
+	result = (rs->ptable[pnum].st << 24) |
+		((rs->ptable[pnum].st << 8) & 0xff0000) |
+		((rs->ptable[pnum].st >> 8) & 0xff00) |
+		(rs->ptable[pnum].st >> 24);
+
+	if (pactive)
+		*pactive = rs->ptable[pnum].flg;
+
+	if (pptype)
+	{
+		memcpy(pptype, rs->ptable[pnum].id, 3);	// TODO maybe convert IDs to enum?
+		pptype[3] = 0;
+	}
+
+	if (psize)
+		*psize = (rs->ptable[pnum].siz << 24) |
+		((rs->ptable[pnum].siz << 8) & 0xff0000) |
+		((rs->ptable[pnum].siz >> 8) & 0xff00) |
+		(rs->ptable[pnum].siz >> 24);
+
+	return result;
+
+#endif
+
 }
 
 
@@ -157,12 +186,18 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 		return DFS_ERRMISC;
 
 	int bytes_per_sector = (lbr->bpb.BPS_h << 8) | lbr->bpb.BPS_l;
-	if (bytes_per_sector != 128 && bytes_per_sector != 256 && bytes_per_sector != 512 && bytes_per_sector != 1024)
-		return DFS_ERRMISC;
+	if (disk_image.mode != DISKMODE_HARD_DISK)
+	{
+		if (bytes_per_sector != 128 && bytes_per_sector != 256 && bytes_per_sector != 512 && bytes_per_sector != 1024)
+			return DFS_ERRMISC;
+	}
 
 	volinfo->numsecs = (lbr->bpb.NSECTS_l) | (lbr->bpb.NSECTS_h << 8);
-	if (volinfo->numsecs < 1 && volinfo->numsecs>21) // caters for HD floppy drives
-		return DFS_ERRMISC;
+	if (disk_image.mode != DISKMODE_HARD_DISK)
+	{
+		if (volinfo->numsecs < 1 && volinfo->numsecs>21) // caters for HD floppy drives
+			return DFS_ERRMISC;
+	}
 
 	// GEMDOS seems to ignore the high byte, so let's not use it as well (for example: ADITalk v2.3.msa)
 	volinfo->reservedsecs = (lbr->bpb.RES_l) /* | (lbr->bpb.RES_h << 8)*/;
@@ -170,51 +205,76 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 		return DFS_ERRMISC;
 
 	volinfo->secperfat = (lbr->bpb.SPF_l) | (lbr->bpb.SPF_h << 8);
-	if (volinfo->secperfat > 16) // random guess
-		return DFS_ERRMISC;
+	if (disk_image.mode != DISKMODE_HARD_DISK)
+	{
+		if (volinfo->secperfat > 16) // random guess
+			return DFS_ERRMISC;
+	}
 
 	volinfo->label[0] = 0; // For GEMDOS FAT12 this is a file on the root directory
 
-	// note: if rootentries is 0, we must be in a FAT32 volume.
-	volinfo->rootentries = (lbr->bpb.NDIRS_l) | (lbr->bpb.SPF_h << 8);
-	if (volinfo->rootentries > 240 || volinfo->rootentries < 16 /* || volinfo->rootentries % 16 != 0*/)
-		return DFS_ERRMISC;
-	if (volinfo->rootentries % 16)
+	// note: if rootentries is 0, we must be in a FAT16/32 volume.
+	volinfo->rootentries = (lbr->bpb.NDIRS_l) | (lbr->bpb.NDIRS_h << 8);
+
+	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
-		// Some creative disk formatters could actually set this to anything, not just a multiple of 16
-		// (or people just used hex editors for teh lulz). We should quantise the value though because the
-		// calculations below that depend on this will point to trash
-		volinfo->rootentries = (volinfo->rootentries) & 0xfff0;
+		if (volinfo->rootentries > 240 || volinfo->rootentries < 16 /* || volinfo->rootentries % 16 != 0*/)
+			return DFS_ERRMISC;
+		if (volinfo->rootentries % 16)
+		{
+			// Some creative disk formatters could actually set this to anything, not just a multiple of 16
+			// (or people just used hex editors for teh lulz). We should quantise the value though because the
+			// calculations below that depend on this will point to trash
+			volinfo->rootentries = (volinfo->rootentries) & 0xfff0;
+		}
 	}
 
 	// after extracting raw info we perform some useful precalculations
-	volinfo->fat1 = startsector + volinfo->reservedsecs;
-	if (!volinfo->fat1) volinfo->fat1 = 1;	// ggn: GEMDOS specific
+	volinfo->fat1 = startsector + volinfo->reservedsecs * (bytes_per_sector / 512);
+	if (!volinfo->fat1) volinfo->fat1 = 1;	// ggn: GEMDOS FAT12 specific
 
-	int sides = (lbr->bpb.NSIDES_h << 8) | lbr->bpb.NSIDES_l;
-	int disk_image_sectors = disk_image.file_size / SECTOR_SIZE;
-	int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
-	int bpb_sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
-	if ((sides == 1 && disk_image.image_sides == 2) || (bpb_sectors_per_track != disk_image.image_sectors))
+	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
-		// In general, there are cases where the disk has been imaged without taking the BPB under consideration.
-		// So the disk would be imaged with different values (for example 82 instead of 80 tracks, 10 instead of
-		// 9 sectors... you name it). So if we detect this, we have to recalculate the sector offsets. This is done
-		// in recalculate_sector(), but it needs to know the imaged disk geometry, as well as the BPB disk geometry.
-		// So we need to fill in as much info as we can here, and the rest is done during disk image read.
-		// For MSA images it's easy, for .ST images we just have to do our best to guess the disk geometry from file size.
-		disk_image.disk_geometry_does_not_match_bpb = true;
-		disk_image.bpb_sectors_per_track = bpb_sectors_per_track;
-		disk_image.bpb_sides = sides;
+		int sides = (lbr->bpb.NSIDES_h << 8) | lbr->bpb.NSIDES_l;
+		int disk_image_sectors = disk_image.file_size / SECTOR_SIZE;
+		int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
+		int bpb_sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
+		if ((sides == 1 && disk_image.image_sides == 2) || (bpb_sectors_per_track != disk_image.image_sectors))
+		{
+			// In general, there are cases where the disk has been imaged without taking the BPB under consideration.
+			// So the disk would be imaged with different values (for example 82 instead of 80 tracks, 10 instead of
+			// 9 sectors... you name it). So if we detect this, we have to recalculate the sector offsets. This is done
+			// in recalculate_sector(), but it needs to know the imaged disk geometry, as well as the BPB disk geometry.
+			// So we need to fill in as much info as we can here, and the rest is done during disk image read.
+			// For MSA images it's easy, for .ST images we just have to do our best to guess the disk geometry from file size.
+			disk_image.disk_geometry_does_not_match_bpb = true;
+			disk_image.bpb_sectors_per_track = bpb_sectors_per_track;
+			disk_image.bpb_sides = sides;
+		}
 	}
 
-	volinfo->rootdir = volinfo->fat1 + (volinfo->secperfat * 2);
+	if (disk_image.mode == DISKMODE_HARD_DISK)
+	{
+		volinfo->rootdir = volinfo->fat1 + (volinfo->secperfat * 2) * (bytes_per_sector / 512);
+		volinfo->dataarea = volinfo->rootdir + (((volinfo->rootentries * 32) + (SECTOR_SIZE - 1)) / SECTOR_SIZE);
 
-	volinfo->dataarea = volinfo->rootdir + (((volinfo->rootentries * 32) + (SECTOR_SIZE - 1)) / SECTOR_SIZE);
+	}
+	else
+	{
+		volinfo->rootdir = volinfo->fat1 + (volinfo->secperfat * 2);
+		volinfo->dataarea = volinfo->rootdir + (((volinfo->rootentries * 32) + (SECTOR_SIZE - 1)) / SECTOR_SIZE);
+	}
 #endif
 
 	// Calculate number of clusters in data area and infer FAT type from this information.
-	volinfo->numclusters = (volinfo->numsecs - volinfo->dataarea) / volinfo->secperclus;
+	// ggn: the commented formula seems to be wrong
+	// volinfo->numclusters = (volinfo->numsecs - volinfo->dataarea) / volinfo->secperclus;
+	volinfo->numclusters = (volinfo->startsector + volinfo->numsecs - volinfo->dataarea) / volinfo->secperclus;
+
+	if (disk_image.mode == DISKMODE_HARD_DISK)
+	{
+		volinfo->secperclus *= bytes_per_sector / 512;
+	}
 
 	if (volinfo->numclusters < 4085)
 		volinfo->filesystem = FAT12;
@@ -614,7 +674,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 				}
 				else { // ggn - FAT12
 					dirinfo->currentcluster = (uint32_t)de.startclus_l_l |
-						((uint32_t)de.startclus_l_h&0xf) << 8;
+						((uint32_t)de.startclus_l_h & 0xf) << 8;
 				}
 
 				dirinfo->currentsector = 0;
