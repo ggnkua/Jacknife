@@ -228,7 +228,6 @@ int DFS_HostAttach(tArchive *arch)
 	disk_image.file_size = _ftelli64(disk_image.file_handle);
 	fseek(disk_image.file_handle, 0, SEEK_SET);
 
-	disk_image.cached_into_ram = false;
 	disk_image.disk_geometry_does_not_match_bpb = false;
 	disk_image.mode = DISKMODE_HARD_DISK;
 
@@ -239,7 +238,6 @@ int DFS_HostAttach(tArchive *arch)
 	}
 
 	// Definitely a disk image, let's cache it into RAM
-	disk_image.cached_into_ram = true;
 	disk_image.buffer = (uint8_t *)malloc((size_t)disk_image.file_size);
 	if (!disk_image.buffer) return -1;
 	if (!fread(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
@@ -305,7 +303,6 @@ int DFS_HostAttach(tArchive *arch)
 			return -1;
 		}
 	}
-	disk_image.cached_into_ram = true;
 	return DFS_OK;
 }
 
@@ -336,7 +333,7 @@ int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
 		return -1;
 
-	if (disk_image.cached_into_ram)
+	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
 		memcpy(buffer, &disk_image.buffer[sector * SECTOR_SIZE], SECTOR_SIZE);
 		return 0;
@@ -373,7 +370,7 @@ int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
 		return -1;
 
-	if (disk_image.cached_into_ram)
+	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
 		memcpy(&disk_image.buffer[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
 		return 0;
@@ -470,7 +467,7 @@ uint8_t *make_msa(tArchive *arch)
 
 int DFS_HostDetach(tArchive *arch)
 {
-	if (disk_image.cached_into_ram)
+	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
 		if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_NO_CONF)
 		{

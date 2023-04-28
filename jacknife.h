@@ -7,12 +7,12 @@
 #endif
 
 typedef enum {
-	DISKMODE_LINEAR						= 0,
-	DISKMODE_MSA						= 1,
-	DISKMODE_FCOPY_CONF_ALL_SECTORS		= 2,
-	DISKMODE_FCOPY_CONF_USED_SECTORS	= 3,
-	DISKMODE_FCOPY_NO_CONF				= 4,
-	DISKMODE_HARD_DISK					= 5,
+	DISKMODE_HARD_DISK					= 0,
+	DISKMODE_LINEAR						= 1,
+	DISKMODE_MSA						= 2,
+	DISKMODE_FCOPY_CONF_ALL_SECTORS		= 3,
+	DISKMODE_FCOPY_CONF_USED_SECTORS	= 4,
+	DISKMODE_FCOPY_NO_CONF				= 5,
 } disk_modes;
 
 #define BYTE_SWAP_LONG(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
@@ -47,7 +47,6 @@ typedef struct DISK_IMAGE_INFO_
 	FILE	*file_handle;				// references host-side image file
 	uint8_t *buffer;					// Buffer for the above
 	int64_t	file_size;					// Size of the above buffer
-	bool	cached_into_ram;			// Should we just load the whole thing into RAM?
 	bool	disk_geometry_does_not_match_bpb;			// See dosfs.cpp for an explanation why this even exists
 	int		bpb_sectors_per_track;		// Only required if the bool above is true
 	int		bpb_sides;					// Same
