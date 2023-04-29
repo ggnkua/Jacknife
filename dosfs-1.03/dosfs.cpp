@@ -66,7 +66,7 @@ uint32_t DFS_GetPtnStart(uint8_t unit, uint8_t *scratchsector, uint8_t pnum, uin
 	return result;
 #else
 	PAHDIRS rs = (PAHDIRS)scratchsector;
-	int a = offsetof(AHDIRS, hd_siz);
+
 	result = (rs->ptable[pnum].st << 24) |
 		((rs->ptable[pnum].st << 8) & 0xff0000) |
 		((rs->ptable[pnum].st >> 8) & 0xff00) |
@@ -236,7 +236,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
 		int sides = (lbr->bpb.NSIDES_h << 8) | lbr->bpb.NSIDES_l;
-		int disk_image_sectors = disk_image.file_size / SECTOR_SIZE;
+		int disk_image_sectors = (int)disk_image.file_size / SECTOR_SIZE;
 		int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
 		int bpb_sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
 		if ((sides == 1 && disk_image.image_sides == 2) || (bpb_sectors_per_track != disk_image.image_sectors))

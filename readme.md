@@ -10,22 +10,21 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 - Opening `.ST` disk images
 - Opening `.MSA` disk iamges
 - Opening `.DIM` disk images (Fastcopy & E-Copy)
+- Hard disk image support
 - Extracting files from images
 - Adding files to images
 - Deleting files from images
 - Deleting source files while adding to image (i.e. "move to archive")
-- Hard disk image support (only first partition for now)
 
 ### What's missing (but planned)
 
 - Creating new disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
 - Deleting empty folders
-- Multiple partition support
 - Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS
-- More adding/deleting tests
 - Stand-alone command line version for scripting (adding files, deleting files, creating new disk images, extract deleted files -because tIn insisted-, monitoring directory and if it changes sync the differences with the image)
 - Integrating into other programs (for example PiSCSI, zeST etc)
+- Extended (XGM) partition support
 
 ## Installation
 
@@ -67,7 +66,7 @@ Again, this program requires a manual installation:
 
 ## Credits
 - FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
-- DOSFS library obtained from http://www.larwe.com/zws/products/dosfs/index.html, modified and debugged (especially for FAT12)
+- DOSFS library obtained from http://www.larwe.com/zws/products/dosfs/index.html (appears to be Public Domain licensed), modified and debugged (especially for FAT12)
 - Original plugin code by @tin-nl
 - Extended and replaced FAT library by @ggnkua
 - Linux/Mac fix by @tattlemuss

@@ -10,7 +10,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#define PATH_SEPERATOR "\\"
+#define PATH_SEPARATOR "\\"
 #else
 #include <unistd.h>
 #define PATH_SEPERATOR "/"
@@ -546,7 +546,7 @@ void DirToCanonical(char *dest, uint8_t *src)
 	*dest = 0;
 }
 
-uint32_t scan_files(char* path, VOLINFO *vi)
+uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 {
 	uint32_t res;
 	int i;
@@ -557,6 +557,13 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 
 	di.scratch = scratch_sector;
 	stEntryList *lastEntry;
+
+	// TODO: this can be supplied by the caller instead of calculated here (think: recursion)
+	char partition_prefix[16] = { 0 };
+	if (disk_image.mode == DISKMODE_HARD_DISK)
+	{
+		sprintf(partition_prefix, "%i" PATH_SEPARATOR, partition);
+	}
 
 	res = DFS_OpenDir(vi, (uint8_t *)path, &di);
 	if (res == DFS_OK) {
@@ -576,12 +583,12 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if (strlen(path)+strlen(lastEntry->filename_canonical) +1 >= MAX_PATH ||
-					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s", path, lastEntry->filename_canonical) == -1) {
+					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, lastEntry->filename_canonical) == -1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
-					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPERATOR, lastEntry->filename_canonical)==-1) {
+					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR, lastEntry->filename_canonical)==-1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
@@ -589,15 +596,18 @@ uint32_t scan_files(char* path, VOLINFO *vi)
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
 				lastEntry = lastEntry->next;
-				res = scan_files(path, vi);
+				res = scan_files(path, vi, partition);
 				di.scratch = scratch_sector;
-				if (res != DFS_OK && res != DFS_EOF) break;
+				if (res != DFS_OK && res != DFS_EOF)
+				{
+					break;
+				}
 				path[i] = 0;
 			}
 			else {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if ( strlen(path)+strlen(lastEntry->filename_canonical)+1>=MAX_PATH ||
-					 sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s", path, lastEntry->filename_canonical) == -1) {
+					 sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, lastEntry->filename_canonical) == -1) {
 					free(scratch_sector);
 					return DFS_ERRMISC;
 				}
@@ -626,30 +636,36 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 	{
 		ArchiveData->OpenResult = E_BAD_ARCHIVE;
 		return false;
-		//goto error;
 	}
 
-	uint32_t partition_start_sector, partition_size;
 	uint8_t scratch_sector[SECTOR_SIZE];
-	partition_start_sector = 0;
-	uint8_t pactive, ptype[4];
 
 	// Obtain pointer to first partition on first (only) unit
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
-		partition_start_sector = DFS_GetPtnStart(0, scratch_sector, 0, &pactive, ptype, &partition_size);
-		if (partition_start_sector == 0xffffffff) {
-
-			//printf("Cannot find first partition\n");
-			return false;
+		PART_INFO *p = disk_image.partition_info;
+		VOLINFO *a = arch->vi;
+		for (int i = 0; i < MAX_PARTITIONS; i++)
+		{
+			p->start_sector = DFS_GetPtnStart(0, scratch_sector, i, &p->active, (uint8_t *)p->type, &p->total_sectors);
+			if (p->start_sector == 0xffffffff)
+			{
+				// Do nothing for now, as other partitions might be ok
+				//printf("Cannot find first partition\n");
+				//return false;
+			}
+			DFS_GetVolInfo(0, scratch_sector, p->start_sector, a);
+			p++;
+			a++;
 		}
 	}
-
-	if (DFS_GetVolInfo(0, scratch_sector, partition_start_sector, &arch->vi)) {
-		//printf("Error getting volume information\n");
-		ArchiveData->OpenResult = E_BAD_DATA;
-		return false;
-		//goto error;
+	else
+	{
+		if (DFS_GetVolInfo(0, scratch_sector, 0, arch->vi)) {
+			//printf("Error getting volume information\n");
+			ArchiveData->OpenResult = E_BAD_DATA;
+			return false;
+		}
 	}
 
 	ArchiveData->OpenResult = 0;// ok
@@ -659,6 +675,7 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 
 tArchive* Open(tOpenArchiveData* ArchiveData)
 {
+	int partitions = 1;
 	tArchive* arch = NULL;
 
 	if ((arch = new tArchive) == NULL)
@@ -678,15 +695,23 @@ tArchive* Open(tOpenArchiveData* ArchiveData)
 	entryList.prev = NULL;
 
 	char path[MAX_PATH + 1];
-	path[0] = 0;
 
 	uint32_t result;
-	result = scan_files((char *)&path, &arch->vi);
-	if (result != DFS_OK && result != DFS_EOF) {
-		arch->currentEntry = &entryList;
-		arch->lastEntry = NULL;
-		ArchiveData->OpenResult = E_BAD_DATA;
-		return arch;
+	if (disk_image.mode == DISKMODE_HARD_DISK)
+	{
+		partitions = MAX_PARTITIONS;
+	}
+
+	for (int i = 0; i < partitions; i++)
+	{
+		path[0] = 0;
+		result = scan_files((char *)&path, &arch->vi[i], i);
+		if (result != DFS_OK && result != DFS_EOF) {
+			arch->currentEntry = &entryList;
+			arch->lastEntry = NULL;
+			ArchiveData->OpenResult = E_BAD_DATA;
+			return arch;
+		}
 	}
 	arch->currentEntry = &entryList;
 	arch->lastEntry = NULL;
@@ -754,10 +779,17 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		return E_NOT_SUPPORTED;
 	}
 
+	int filename_offset = 0;
+	if (disk_image.mode == DISKMODE_HARD_DISK)
+	{
+		// Strip out the partition path prefix (for now it's "0\", "1\", etc depending on partition)
+		filename_offset = 2;
+	}
+
 	if (Operation == PK_EXTRACT && arch->lastEntry != NULL) {
 		uint32_t res;
 		FILEINFO fi;
-		res = DFS_OpenFile(&arch->vi, (uint8_t *)arch->lastEntry->fileWPath, DFS_READ, scratch_sector, &fi, 0);
+		res = DFS_OpenFile(arch->vi, (uint8_t *)arch->lastEntry->fileWPath + filename_offset, DFS_READ, scratch_sector, &fi, 0);
 		if (res != DFS_OK) {
 			return E_EREAD;
 		}
@@ -789,7 +821,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		else {
 			// DestName contains only the file name and DestPath the file path
 			char file[MAX_PATH];
-			sprintf_s(file,MAX_PATH, "%s" PATH_SEPERATOR "%s", DestPath, DestName);
+			sprintf_s(file,MAX_PATH, "%s" PATH_SEPARATOR "%s", DestPath, DestName);
 			FILE* f;
 			fopen_s(&f,file, "wb");
 			if (f == NULL) {
@@ -835,9 +867,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	if (!AddList || *AddList == 0) return E_NO_FILES;
 	tOpenArchiveData archive_data = { 0 };
 	tArchive archive_handle = { 0 };
-	//archive_data.ArcName = PackedFile;
 	strcpy(archive_handle.archname, PackedFile);
-	//archive_handle = Open(&archive_data);
 	bool status = OpenImage(&archive_data, &archive_handle);
 	if (!status)
 	{
@@ -845,9 +875,20 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		// However, since the return sctruct is deleted before returned, we pass this error manually here
 		return E_BAD_ARCHIVE;
 	}
+
 	if (archive_data.OpenResult)
 	{
 		return archive_data.OpenResult;
+	}
+
+	int partition = 0;
+	if (disk_image.mode == DISKMODE_HARD_DISK)
+	{
+		// Determine which partition we are going to write to.
+		partition = *SubPath - '0';
+
+		// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
+		SubPath++;
 	}
 
 	uint32_t res;
@@ -859,14 +900,14 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	{
 
 	}
-	if (SubPath)
+	if (*SubPath)
 	{
 		strcpy(filename_dest, SubPath);
-		strcat(filename_dest, PATH_SEPERATOR);
+		strcat(filename_dest, PATH_SEPARATOR);
 	}
 	else
 	{
-		strcpy(filename_dest, PATH_SEPERATOR);
+		strcpy(filename_dest, PATH_SEPARATOR);
 	}
 	strcpy(filename_source, SrcPath);
 	char *filename_subpath = filename_source + strlen(filename_source);
@@ -907,7 +948,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 		fclose(handle_to_add);
 		strcpy(&filename_dest[1], current_file);
-		res = DFS_OpenFile(&archive_handle.vi, (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
+		res = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
 		if (res != DFS_OK) {
 			free(read_buf);
 			DFS_HostDetach(&archive_handle);
@@ -978,7 +1019,17 @@ int Delete(char *PackedFile, char *DeleteList)
 
 	while (*DeleteList) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
 	{
-		res = DFS_UnlinkFile(&archive_handle->vi, (uint8_t *)DeleteList, scratch_sector);
+		int partition = 0;
+		if (disk_image.mode == DISKMODE_HARD_DISK)
+		{
+			// Determine which partition we are going to write to.
+			partition = *DeleteList - '0';
+
+			// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
+			DeleteList += 2;
+		}
+
+		res = DFS_UnlinkFile(&archive_handle->vi[partition], (uint8_t *)DeleteList, scratch_sector);
 
 		if (res != DFS_OK)
 		{

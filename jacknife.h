@@ -6,6 +6,9 @@
 #define __stdcall
 #endif
 
+#define MAX_PARTITIONS 4
+#define BYTE_SWAP_LONG(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
+
 typedef enum {
 	DISKMODE_HARD_DISK					= 0,
 	DISKMODE_LINEAR						= 1,
@@ -14,9 +17,6 @@ typedef enum {
 	DISKMODE_FCOPY_CONF_USED_SECTORS	= 4,
 	DISKMODE_FCOPY_NO_CONF				= 5,
 } disk_modes;
-
-#define BYTE_SWAP_LONG(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
-
 
 typedef struct stEntryList
 {
@@ -30,7 +30,7 @@ typedef struct stEntryList
 typedef struct
 {
 	char archname[MAX_PATH];
-	VOLINFO vi;
+	VOLINFO vi[MAX_PARTITIONS];
 	stEntryList* currentEntry;
 	stEntryList* lastEntry;
 	FILE* fp;
@@ -40,6 +40,14 @@ typedef struct
 	tChangeVolProc pLocChangeVol;
 	tProcessDataProc pLocProcessData;
 }  tArchive;
+
+typedef struct part_info
+{
+	uint8_t active;
+	char type[4];
+	uint32_t start_sector;	// Possibly unused
+	uint32_t total_sectors;	// Possibly unused
+} PART_INFO;
 
 typedef struct DISK_IMAGE_INFO_
 {
@@ -53,6 +61,7 @@ typedef struct DISK_IMAGE_INFO_
 	int		image_sectors;				// Derived value from image
 	int		image_sides;				// Derived value from image
 	int		image_tracks;				// Derived value from image
+	PART_INFO partition_info[4];
 } DISK_IMAGE_INFO;
 
 typedef struct FCOPY_HEADER_
