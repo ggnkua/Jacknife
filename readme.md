@@ -19,12 +19,13 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 ### What's missing (but planned)
 
 - Creating new disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
-- Deleting empty folders
+- Deleting (empty) folders
+- Creating new folders
+- Extended (XGM) partition support
 - Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS
 - Stand-alone command line version for scripting (adding files, deleting files, creating new disk images, extract deleted files -because tIn insisted-, monitoring directory and if it changes sync the differences with the image)
 - Integrating into other programs (for example PiSCSI, zeST etc)
-- Extended (XGM) partition support
 
 ## Installation
 

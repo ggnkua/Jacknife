@@ -900,7 +900,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	{
 
 	}
-	if (*SubPath)
+	if (SubPath && *SubPath)
 	{
 		strcpy(filename_dest, SubPath);
 		strcat(filename_dest, PATH_SEPARATOR);
@@ -1001,14 +1001,17 @@ int Delete(char *PackedFile, char *DeleteList)
 
 	tOpenArchiveData archive_data = { 0 };
 	archive_data.ArcName = PackedFile;
-	tArchive *archive_handle;
-	archive_handle = Open(&archive_data);
-	if (!archive_handle)
+	tArchive archive_handle = { 0 };
+
+	strcpy(archive_handle.archname, PackedFile);
+	bool status = OpenImage(&archive_data, &archive_handle);
+	if (!status)
 	{
 		// This is what Open() returns if it reaches an error (archive_handle=NULL).
 		// However, since the return sctruct is deleted before returned, we pass this error manually here
 		return E_BAD_ARCHIVE;
 	}
+
 	if (archive_data.OpenResult)
 	{
 		return archive_data.OpenResult;
@@ -1029,18 +1032,18 @@ int Delete(char *PackedFile, char *DeleteList)
 			DeleteList += 2;
 		}
 
-		res = DFS_UnlinkFile(&archive_handle->vi[partition], (uint8_t *)DeleteList, scratch_sector);
+		res = DFS_UnlinkFile(&archive_handle.vi[partition], (uint8_t *)DeleteList, scratch_sector);
 
 		if (res != DFS_OK)
 		{
-			Close(archive_handle);
+			DFS_HostDetach(&archive_handle);
 			return E_ECLOSE;
 		}
 
 		DeleteList += strlen(DeleteList) + 1;
 	}
-	archive_handle->volume_dirty = true;
-	Close(archive_handle);
+	archive_handle.volume_dirty = true;
+	DFS_HostDetach(&archive_handle);
 
 	return 0; // All ok
 }
