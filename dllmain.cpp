@@ -520,7 +520,7 @@ stEntryList* findLastEntry() {
 	return entry;
 }
 
-void DirToCanonical(char *dest, uint8_t *src)
+void DirToCanonical(char dest[13], uint8_t *src)
 {
 	bool added_dot = false;
 	for (int i = 0; i < 11; i++)
@@ -582,22 +582,21 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 			}
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
-				if (strlen(path)+strlen(lastEntry->filename_canonical) +1 >= MAX_PATH ||
+				if (strlen(path) + strlen(lastEntry->filename_canonical) + 1 >= MAX_PATH ||
 					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, lastEntry->filename_canonical) == -1) {
-					free(scratch_sector);
-					return DFS_ERRMISC;
+					res= DFS_ERRMISC;
+					break;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
-					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR, lastEntry->filename_canonical)==-1) {
-					free(scratch_sector);
-					return DFS_ERRMISC;
+					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR, lastEntry->filename_canonical) == -1) {
+					res=DFS_ERRMISC;
+					break;
 				}
 				lastEntry->next = new stEntryList();
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
 				lastEntry = lastEntry->next;
 				res = scan_files(path, vi, partition);
-				di.scratch = scratch_sector;
 				if (res != DFS_OK && res != DFS_EOF)
 				{
 					break;
@@ -606,10 +605,11 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 			}
 			else {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
-				if ( strlen(path)+strlen(lastEntry->filename_canonical)+1>=MAX_PATH ||
-					 sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, lastEntry->filename_canonical) == -1) {
-					free(scratch_sector);
-					return DFS_ERRMISC;
+				if (strlen(path) + strlen(lastEntry->filename_canonical) + 1 >= MAX_PATH ||
+					sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, lastEntry->filename_canonical) == -1)
+				{
+					res = DFS_ERRMISC;
+					break;
 				}
 				lastEntry->next = new stEntryList();
 				lastEntry->next->prev = lastEntry;
@@ -994,7 +994,82 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	return 0; // All ok
 }
 
-// TODO: Delete folder(s)
+uint32_t scan_folder_and_delete(PVOLINFO vi, char *path)
+{
+	uint8_t *scratch_dir = (uint8_t *)malloc(SECTOR_SIZE);
+	if (!scratch_dir) return DFS_ERRMISC;
+	uint8_t *scratch_delete = (uint8_t *)malloc(SECTOR_SIZE);
+	if (!scratch_delete) return DFS_ERRMISC;
+
+	PDIRINFO di = (PDIRINFO)malloc(sizeof(DIRINFO));
+	if (!di) return DFS_ERRMISC;
+	di->scratch = scratch_dir;
+
+	uint32_t ret;
+	
+	ret = DFS_OpenDir(vi, (uint8_t *)path, di);
+	if (ret != DFS_OK) return ret;
+	char filename_canonical[13];
+
+	DIRENT de;
+
+	do
+	{
+		ret = DFS_GetNext(vi, di, &de);
+
+		if (ret == DFS_EOF) break;
+
+		if (de.name[0] == 0) continue;
+		if (strcmp((char *)de.name, ".          \x10") == 0) continue;
+		if (strcmp((char *)de.name, "..         \x10") == 0) continue;
+		DirToCanonical(filename_canonical, de.name);
+		if (de.attr & ATTR_VOLUME_ID)
+		{
+			continue;
+		}
+		if (de.attr & ATTR_DIRECTORY)
+		{
+			char new_path[MAX_PATH + 1];
+			sprintf(new_path, "%s\\%s", path, de.name);
+			ret = scan_folder_and_delete(vi, new_path);
+
+			if (ret != DFS_OK && ret != DFS_EOF)
+			{
+				break;
+			}
+
+		}
+		else
+		{
+			uint8_t filename_to_delete[MAX_PATH + 1];
+			if (strlen(path) + strlen(filename_canonical) + 1 >= MAX_PATH ||
+				sprintf_s((char *const )filename_to_delete, MAX_PATH, "%s\\%s", path, filename_canonical) == -1)
+			{
+				ret = DFS_ERRMISC;
+				break;
+			}
+
+			ret = DFS_UnlinkFile(vi, filename_to_delete, scratch_delete);
+			if (ret != DFS_OK)
+			{
+				break;
+			}
+
+		}
+	} while (1);
+
+	if (ret == DFS_EOF)
+	{
+		// Delete the actual folder
+		ret = DFS_UnlinkFile(vi, (uint8_t *)path, scratch_dir);
+	}
+
+	free(scratch_dir);
+	free(scratch_delete);
+	free(di);
+	return ret;
+}
+
 int Delete(char *PackedFile, char *DeleteList)
 {
 	if (!DeleteList || !*DeleteList) return E_NO_FILES;
@@ -1032,7 +1107,18 @@ int Delete(char *PackedFile, char *DeleteList)
 			DeleteList += 2;
 		}
 
-		res = DFS_UnlinkFile(&archive_handle.vi[partition], (uint8_t *)DeleteList, scratch_sector);
+		if (strlen(DeleteList) > 4 && strcmp(&DeleteList[strlen(DeleteList) - 3], "*.*") == 0)
+		{
+			// We have to delete a folder. This is more tricky as we need to ensure that the folder
+			// is empty first. Which means we have to recursively scan and delete all the things
+			DeleteList[strlen(DeleteList) - 4] = 0; // Remove the "\*.*" postfix
+			res = scan_folder_and_delete(&archive_handle.vi[partition], DeleteList);
+			DeleteList += strlen(DeleteList) + 1; // Point to "*.*" which we chopped out above, so we can then point to the next item to delete (if any)
+		}
+		else
+		{
+			res = DFS_UnlinkFile(&archive_handle.vi[partition], (uint8_t *)DeleteList, scratch_sector);
+		}
 
 		if (res != DFS_OK)
 		{

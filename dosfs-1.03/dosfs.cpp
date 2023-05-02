@@ -917,10 +917,6 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 
 	while (!DFS_GetNext(volinfo, &di, &de)) {
 		if (!memcmp(de.name, filename, 11)) {
-			// You can't use this function call to open a directory.
-			if (de.attr & ATTR_DIRECTORY)
-				return DFS_NOTFOUND;
-
 			fileinfo->volinfo = volinfo;
 			fileinfo->pointer = 0;
 			// The reason we store this extra info about the file is so that we can
@@ -946,6 +942,12 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 			  ((uint32_t) de.filesize_1) << 8 |
 			  ((uint32_t) de.filesize_2) << 16 |
 			  ((uint32_t) de.filesize_3) << 24;
+
+			// You can't use this function call to open a directory.
+			if (de.attr & ATTR_DIRECTORY)
+				// ggn: But UnlinkFile() might ask us if this directory exists, so better explicitly return that
+				//return DFS_NOTFOUND;
+				return DFS_ISDIRECTORY;
 
 			return DFS_OK;
 		}
@@ -1232,7 +1234,10 @@ uint32_t DFS_UnlinkFile(PVOLINFO volinfo, uint8_t *path, uint8_t *scratch)
 	uint32_t tempclus;
 
 	// DFS_OpenFile gives us all the information we need to delete it
-	if (DFS_OK != DFS_OpenFile(volinfo, path, DFS_READ, scratch, &fi, 0))
+	// ggn: extended for the case of deleting an empty folder (the caller assumes responsibility for this)
+	//if (DFS_OK != DFS_OpenFile(volinfo, path, DFS_READ, scratch, &fi, 0))
+	uint32_t ret = DFS_OpenFile(volinfo, path, DFS_READ, scratch, &fi, 0);
+	if (ret != DFS_OK && ret != DFS_ISDIRECTORY)
 		return DFS_NOTFOUND;
 
 	// First, read the directory sector and delete that entry
