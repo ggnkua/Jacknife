@@ -45,7 +45,6 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 	int endTrack = ((int)packedMsa[8] << 8) | ((int)packedMsa[9]);
 	//just ignore partial disk images, skipping tracks would skip bpb/fat, too
 	if (startTrack != 0 || endTrack == 0) {
-		free(packedMsa);
 		return NULL;
 	}
 	int unpackedSize = sectors * 512 * sides * (endTrack + 1);
