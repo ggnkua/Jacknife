@@ -988,16 +988,18 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			DFS_HostDetach(&archive_handle);
 			return E_NO_MEMORY;
 		}
-		fseek(handle_to_add, 0, SEEK_SET);
-		items_read = fread(read_buf, file_size, 1, handle_to_add);
-		if (!items_read)
+		if (file_size) // don't read for 0 sized files
 		{
-			fclose(handle_to_add);
-			free(read_buf);
-			DFS_HostDetach(&archive_handle);
-			return E_EREAD;
+			fseek(handle_to_add, 0, SEEK_SET);
+			items_read = fread(read_buf, file_size, 1, handle_to_add);
+			if (!items_read)
+			{
+				fclose(handle_to_add);
+				free(read_buf);
+				DFS_HostDetach(&archive_handle);
+				return E_EREAD;
+			}
 		}
-
 		fclose(handle_to_add);
 		strcpy(&filename_dest[1], current_file);
 		res = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
