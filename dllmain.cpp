@@ -929,11 +929,14 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		// TODO: boy, this is going to be a doozy to code for non Windows systems
 		strcpy(filename_subpath, current_file);
 
+#ifdef _WIN32
 		if (!GetShortPathNameA(filename_source, current_short_file, MAX_PATH)) 
 		{
-			DWORD lol = GetLastError();
 			return E_NO_MEMORY;
 		}
+#else
+		#error Have to implement GetShortPathNameA
+#endif
 		char *current_short_file_without_path = current_short_file + strlen(SrcPath);
 
 		if (current_file[strlen(current_file) - 1] == '\\')
