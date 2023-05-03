@@ -9,7 +9,8 @@
 #define MAX_PARTITIONS 4
 #define BYTE_SWAP_LONG(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
 
-typedef enum {
+typedef enum
+{
 	DISKMODE_HARD_DISK					= 0,
 	DISKMODE_LINEAR						= 1,
 	DISKMODE_MSA						= 2,
@@ -17,6 +18,17 @@ typedef enum {
 	DISKMODE_FCOPY_CONF_USED_SECTORS	= 4,
 	DISKMODE_FCOPY_NO_CONF				= 5,
 } disk_modes;
+
+typedef enum
+{
+	J_OK,
+	J_FILE_NOT_FOUND,
+	J_MALLOC_ERROR,
+	J_INVALID_MSA,
+	J_INALID_DIM,
+	J_INVALID_HARD_DISK_IMAGE,
+	J_FAIL,
+} return_codes;
 
 typedef struct stEntryList
 {

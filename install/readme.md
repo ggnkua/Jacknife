@@ -17,10 +17,10 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 - Deleting files
 - Deleting source files while adding to image (i.e. "move to archive")
 - Deleting folders recursively
+- Creating new floppy disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
 
 ### What's missing (but planned)
 
-- Creating new disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
 - Extended (XGM) partition support
 - Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS

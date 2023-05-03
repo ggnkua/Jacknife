@@ -217,11 +217,11 @@ unsigned char *expand_dim(bool fastcopy_header)
 	Attach emulation to a host-side disk image file
 	Returns 0 OK, nonzero for any error
 */
-int DFS_HostAttach(tArchive *arch)
+uint32_t DFS_HostAttach(tArchive *arch)
 {
 	disk_image.file_handle = fopen(arch->archname, "r+b");
 	if (disk_image.file_handle == NULL)
-		return -1;
+		return J_FILE_NOT_FOUND;
 
 	fseek(disk_image.file_handle, 0, SEEK_END);
 	disk_image.file_size = _ftelli64(disk_image.file_handle);
@@ -233,12 +233,12 @@ int DFS_HostAttach(tArchive *arch)
 	if (disk_image.file_size > 2880 * 1024)
 	{
 		// Hard disk image, that's all we need to do
-		return 0;
+		return J_OK;
 	}
 
 	// Definitely a disk image, let's cache it into RAM
 	disk_image.buffer = (uint8_t *)malloc((size_t)disk_image.file_size);
-	if (!disk_image.buffer) return -1;
+	if (!disk_image.buffer) return J_MALLOC_ERROR;
 	if (!fread(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
 	fclose(disk_image.file_handle);
 	disk_image.mode = DISKMODE_LINEAR;
@@ -251,7 +251,7 @@ int DFS_HostAttach(tArchive *arch)
 		free(disk_image.buffer);
 		if (!unpacked_msa)
 		{
-			return -1;
+			return J_INVALID_MSA;
 		}
 		disk_image.buffer = unpacked_msa;
 	}
@@ -262,7 +262,7 @@ int DFS_HostAttach(tArchive *arch)
 		if (h->start_track)
 		{
 			// Nope, we don't support partial images
-			return -1;
+			return J_INALID_DIM;
 		}
 		if (h->disk_configuration_present)
 		{
@@ -277,7 +277,7 @@ int DFS_HostAttach(tArchive *arch)
 				uint8_t *expanded = expand_dim(true);
 				if (!expanded)
 				{
-					return -1;
+					return J_INALID_DIM;
 				}
 				disk_image.buffer = expanded;
 			}
@@ -302,7 +302,7 @@ int DFS_HostAttach(tArchive *arch)
 			return -1;
 		}
 	}
-	return DFS_OK;
+	return J_OK;
 }
 
 uint32_t recalculate_sector(uint32_t sector)
@@ -623,7 +623,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 	return res;
 }
 
-bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
+uint32_t OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 {
 	ArchiveData->CmtBuf = 0;
 	ArchiveData->CmtBufSize = 0;
@@ -631,10 +631,11 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 	ArchiveData->CmtState = 0;
 	ArchiveData->OpenResult = E_NO_MEMORY;// default error type
 
-	if (DFS_HostAttach(arch) != DFS_OK)
+	uint32_t ret= DFS_HostAttach(arch);
+	if (ret != J_OK)
 	{
 		ArchiveData->OpenResult = E_BAD_ARCHIVE;
-		return false;
+		return ret;
 	}
 
 	uint8_t scratch_sector[SECTOR_SIZE];
@@ -652,6 +653,7 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 				// Do nothing for now, as other partitions might be ok
 				//printf("Cannot find first partition\n");
 				//return false;
+				// TODO: check if all partitions are bad and error out
 			}
 			DFS_GetVolInfo(0, scratch_sector, p->start_sector, a);
 			p++;
@@ -663,13 +665,13 @@ bool OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 		if (DFS_GetVolInfo(0, scratch_sector, 0, arch->vi)) {
 			//printf("Error getting volume information\n");
 			ArchiveData->OpenResult = E_BAD_DATA;
-			return false;
+			return J_INVALID_HARD_DISK_IMAGE;
 		}
 	}
 
 	ArchiveData->OpenResult = 0;// ok
 
-	return true;
+	return J_OK;
 }
 
 tArchive* Open(tOpenArchiveData* ArchiveData)
@@ -687,7 +689,7 @@ tArchive* Open(tOpenArchiveData* ArchiveData)
 	pCurrentArchive = arch;
 
 	// trying to open
-	if (!OpenImage(ArchiveData, arch))
+	if (OpenImage(ArchiveData, arch) != J_OK)
 		goto error;
 
 	entryList.next = NULL;
@@ -862,21 +864,177 @@ int Close(tArchive* hArcData)
 	return 0;// ok
 };
 
+// Make Visual Studio shut up about warnings in the following code.
+// The author knows what they're doing, dear, so kindly go play somewhere else
+#pragma warning(disable:4146)
+#pragma warning(disable:4244)
+
+// *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / pcg-random.org
+// Licensed under Apache License 2.0 (NO WARRANTY, etc. see website)
+
+typedef struct { uint64_t state;  uint64_t inc; } pcg32_random_t;
+
+uint32_t pcg32_random_r(pcg32_random_t *rng)
+{
+	uint64_t oldstate = rng->state;
+	// Advance internal state
+	rng->state = oldstate * 6364136223846793005ULL + (rng->inc | 1);
+	// Calculate output function (XSH RR), uses old state for max ILP
+	uint32_t xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
+	uint32_t rot = oldstate >> 59u;
+	return (xorshifted >> rot) | (xorshifted << ((-rot) & 31));
+}
+
+// pcg32_srandom(initstate, initseq)
+// pcg32_srandom_r(rng, initstate, initseq):
+//     Seed the rng.  Specified in two parts, state initializer and a
+//     sequence selection constant (a.k.a. stream id)
+
+void pcg32_srandom_r(pcg32_random_t *rng, uint64_t initstate, uint64_t initseq)
+{
+	rng->state = 0U;
+	rng->inc = (initseq << 1u) | 1u;
+	pcg32_random_r(rng);
+	rng->state += initstate;
+	pcg32_random_r(rng);
+}
+
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
-	if (!AddList || *AddList == 0) return E_NO_FILES;
+	uint32_t ret;
+	FILEINFO fi;
+	uint8_t scratch_sector[SECTOR_SIZE];
 	tOpenArchiveData archive_data = { 0 };
 	tArchive archive_handle = { 0 };
+	char filename_source[MAX_PATH];
+	char filename_dest[MAX_PATH];
+	char *filename_subpath;
+	char *current_file;
+	int create_new_disk_image_type = 0;
+
+	if (!AddList || *AddList == 0) return E_NO_FILES;
 	strcpy(archive_handle.archname, PackedFile);
-	bool status = OpenImage(&archive_data, &archive_handle);
-	if (!status)
+	ret = OpenImage(&archive_data, &archive_handle);
+
+	try_new_image_size:
+	if (ret == J_FILE_NOT_FOUND)
 	{
-		// This is what Open() returns if it reaches an error (archive_handle=NULL).
-		// However, since the return sctruct is deleted before returned, we pass this error manually here
-		return E_BAD_ARCHIVE;
+		// Let's create a disk image and attach it
+		int sides, tracks, sectors;
+		uint8_t *buf;
+
+		create_new_disk_image_type++;
+		if (create_new_disk_image_type == 1)
+		{
+			// 80 tracks, 9 sectors, 2 sides
+			tracks = 80;
+			sides = 2;
+			sectors = 9;
+		}
+		else if (create_new_disk_image_type == 2)
+		{
+			// 82 tracks, 10 sectors, 2 sides
+			tracks = 82;
+			sides = 2;
+			sectors = 10;
+		}
+		else if (create_new_disk_image_type == 3)
+		{
+			// 82 tracks, 11 sectors, 2 sides
+			tracks = 82;
+			sides = 2;
+			sectors = 11;
+		}
+		else
+		{
+			// We tried everything we could for double density disks, give up (for now)
+			// TODO: support high density disks
+			return E_TOO_MANY_FILES;
+		}
+
+		buf = (uint8_t *)calloc(1, tracks * sides * sectors * 512);
+		if (!buf)
+		{
+			return E_OUTOFMEMORY;
+		}
+
+		// TODO: initialisations are copied from STEem engine's blank images, perhaps we could make this even better?
+		PLBR rs = (PLBR)buf;
+		rs->bra = 0x30eb;
+
+		// Get a random number for the disk serial (check out https://github.com/imneme/pcg-c-basic/blob/master/pcg32-demo.c)
+		pcg32_random_t rng;
+		int rounds = 5;
+		pcg32_srandom_r(&rng, time(NULL) ^ (intptr_t)&printf, (intptr_t)&rounds);
+
+		rs->serial[0] = (uint8_t)(rng.state);
+		rs->serial[1] = (uint8_t)(rng.state>>8);
+		rs->serial[2] = (uint8_t)(rng.state>>16);
+
+		rs->bpb.BPS_l = (uint8_t)(512);
+		rs->bpb.BPS_h = (uint8_t)(512>>8);
+		rs->bpb.SPC = 2;
+		rs->bpb.RES_l = 1;
+		rs->bpb.RES_h = 0;
+		rs->bpb.NFATS = 2;
+		rs->bpb.NDIRS_l = (uint8_t)(112);
+		rs->bpb.NDIRS_h = (uint8_t)(112>>8);
+		rs->bpb.NSECTS_l = (uint8_t)(tracks*sectors*sides);
+		rs->bpb.NSECTS_h = (uint8_t)((tracks * sectors * sides)>>8);
+		rs->bpb.MEDIA = 0xf9;
+		rs->bpb.SPF_l = 5;
+		rs->bpb.SPF_h = 0;
+		rs->bpb.SPT_l = sectors;
+		rs->bpb.SPT_h = 0;
+		rs->bpb.NSIDES_l = 2;
+		rs->bpb.NSIDES_h = 0;
+		rs->bpb.NHID_l = 0;
+		rs->bpb.NHID_h = 0;
+
+		rs->checksum[0] = 0x97;
+		rs->checksum[1] = 0xc7;
+
+		// Initialise FAT table
+		buf[512+0] = 0xf0;
+		buf[512+1] = 0xff;
+		buf[512+2] = 0xff;
+
+		if (strlen(PackedFile) > 3 && _strcmpi(PackedFile + strlen(PackedFile) - 3, ".st") == 0)
+		{
+			disk_image.mode = DISKMODE_LINEAR;
+		}
+		else if (strlen(PackedFile) > 4 && _strcmpi(PackedFile + strlen(PackedFile) - 4, ".msa") == 0)
+		{
+			disk_image.mode = DISKMODE_MSA;
+		}
+		else if (strlen(PackedFile) > 4 && _strcmpi(PackedFile + strlen(PackedFile) - 4, ".dim") == 0)
+		{
+			disk_image.mode = DISKMODE_FCOPY_CONF_ALL_SECTORS;
+			return E_UNKNOWN_FORMAT; // No .dim write support yet
+		}
+		else
+		{
+			return E_UNKNOWN_FORMAT;
+		}
+
+		disk_image.buffer = buf;
+		disk_image.file_size = tracks * sectors * sides * SECTOR_SIZE;
+		disk_image.disk_geometry_does_not_match_bpb = false;
+		disk_image.image_sectors = sectors;
+		disk_image.image_sides = sides;
+		disk_image.image_tracks = tracks - 1;
+
+		// Now, let DOSFS fill its internal tables
+		if (DFS_GetVolInfo(0, scratch_sector, 0, &archive_handle.vi[0])) {
+			// I mean, we shouldn't get here since the data should be correct,
+			// but let's just leave it here until we're done testing
+			return E_BAD_DATA;
+		}
+
+		ret = J_OK; // Bypass exit condition below
 	}
 
-	if (archive_data.OpenResult)
+	if (ret != J_OK)
 	{
 		return archive_data.OpenResult;
 	}
@@ -891,14 +1049,9 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		SubPath++;
 	}
 
-	uint32_t res;
-	FILEINFO fi;
-	uint8_t scratch_sector[SECTOR_SIZE];
-	char filename_source[MAX_PATH];
-	char filename_dest[MAX_PATH];
 	if (Flags & PK_PACK_SAVE_PATHS)
 	{
-		// TODO
+		// TODO (basically we support this, we need to also support the inverse, i.e. removing paths)
 	}
 	if (SubPath && *SubPath)
 	{
@@ -910,8 +1063,8 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		strcpy(filename_dest, PATH_SEPARATOR);
 	}
 	strcpy(filename_source, SrcPath);
-	char *filename_subpath = filename_source + strlen(filename_source);
-	char *current_file = AddList;
+	filename_subpath = filename_source + strlen(filename_source);
+	current_file = AddList;
 	while (*current_file) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
 	{
 		struct tm *file_tm;
@@ -949,8 +1102,8 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			time(&ltime);	// Get current date/time
 			file_tm = localtime(&ltime);
 			file_timestamp = ((file_tm->tm_year - 80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
-			res = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)current_file, DFS_WRITE | DFS_FOLDER, scratch_sector, &fi, file_timestamp);
-			if (res != DFS_OK) {
+			ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)current_file, DFS_WRITE | DFS_FOLDER, scratch_sector, &fi, file_timestamp);
+			if (ret != DFS_OK) {
 				DFS_HostDetach(&archive_handle);
 				return E_ECREATE;
 			}
@@ -976,9 +1129,9 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
 			de->wrttime_h = (uint8_t)(file_timestamp >> 8);
 			de->wrttime_l = (uint8_t)file_timestamp;
-			res = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, SECTOR_SIZE*2);
+			ret = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, SECTOR_SIZE*2);
 			free(buf);
-			if (res != DFS_OK) {
+			if (ret != DFS_OK) {
 				DFS_HostDetach(&archive_handle);
 				return E_ECREATE;
 			}
@@ -997,7 +1150,8 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		file_timestamp = ((file_tm->tm_year-80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
 		fseek(handle_to_add, 0, SEEK_END);
 		file_size = ftell(handle_to_add);
-		if (file_size < 0) {
+		if (file_size < 0)
+		{
 			return E_NO_FILES;
 		}
 		read_buf = (unsigned char *)calloc(1, file_size + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
@@ -1020,26 +1174,34 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		}
 		fclose(handle_to_add);
 		strcpy(&filename_dest[1], current_short_file_without_path);
-		res = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
-		if (res != DFS_OK)
+		ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
+		if (ret != DFS_OK)
 		{
 			free(read_buf);
 			DFS_HostDetach(&archive_handle);
 			return E_ECREATE;
 		}
-		res = DFS_WriteFile(&fi, scratch_sector, read_buf, &bytes_written, file_size);
-		if (res != DFS_OK)
-		{
-			free(read_buf);
-			DFS_HostDetach(&archive_handle);
-			return E_EWRITE;
-		}
+		ret = DFS_WriteFile(&fi, scratch_sector, read_buf, &bytes_written, file_size);
 		if (bytes_written != file_size)
 		{
 			// Out of disk space - unsure what error to return here
 			free(read_buf);
+			if (create_new_disk_image_type)
+			{
+				// We tried to create a new disk image and send the files in, but the files didn't fit
+				// Try with a disk geometry that gives a bigger size, if available
+				free(disk_image.buffer);
+				ret = J_FILE_NOT_FOUND;
+				goto try_new_image_size;
+			}
 			DFS_HostDetach(&archive_handle);
 			return E_TOO_MANY_FILES;
+		}
+		if (ret != DFS_OK)
+		{
+			free(read_buf);
+			DFS_HostDetach(&archive_handle);
+			return E_EWRITE;
 		}
 		free(read_buf);
 		// Point to next file (or NULL termination)
@@ -1152,15 +1314,8 @@ int Delete(char *PackedFile, char *DeleteList)
 	tArchive archive_handle = { 0 };
 
 	strcpy(archive_handle.archname, PackedFile);
-	bool status = OpenImage(&archive_data, &archive_handle);
-	if (!status)
-	{
-		// This is what Open() returns if it reaches an error (archive_handle=NULL).
-		// However, since the return sctruct is deleted before returned, we pass this error manually here
-		return E_BAD_ARCHIVE;
-	}
-
-	if (archive_data.OpenResult)
+	uint32_t ret = OpenImage(&archive_data, &archive_handle);
+	if (ret != J_OK)
 	{
 		return archive_data.OpenResult;
 	}
