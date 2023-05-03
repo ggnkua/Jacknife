@@ -297,8 +297,8 @@ typedef struct _tagLBR {
 	uint8_t oem[6];				// These six bytes are reserved for use as any necessary filler information. The disk-based TOS loader program places the string 'Loader' here.
 	uint8_t serial[3];			// The low 24-bits of this LONG represent a unique disk serial number.
 	STBPB bpb;
-	uint8_t code[482];			// This area is used by any executable boot code. The code must be completely relocatable as its loaded position in memory is not guaranteed.
-	uint16_t checksum[2];		// The entire boot sector WORD summed with this Motorola format WORD will equal 0x1234 if the boot sector is executable or some other value if not.
+	uint8_t code[480];			// This area is used by any executable boot code. The code must be completely relocatable as its loaded position in memory is not guaranteed.
+	uint8_t checksum[2];		// The entire boot sector WORD summed with this Motorola format WORD will equal 0x1234 if the boot sector is executable or some other value if not.
 #endif
 } LBR, *PLBR;
 
