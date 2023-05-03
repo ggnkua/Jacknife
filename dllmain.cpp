@@ -922,6 +922,20 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		unsigned char *read_buf;
 		size_t items_read;
 		unsigned int bytes_written;
+		char current_short_file[MAX_PATH + 1];
+
+		// Because the DOSFS lib has a really bad time with long filename entries (and for good reasons)
+		// convert the filename into a 8.3 entry before using it.
+		// TODO: boy, this is going to be a doozy to code for non Windows systems
+		strcpy(filename_subpath, current_file);
+
+		if (!GetShortPathNameA(filename_source, current_short_file, MAX_PATH)) 
+		{
+			DWORD lol = GetLastError();
+			return E_NO_MEMORY;
+		}
+		char *current_short_file_without_path = current_short_file + strlen(SrcPath);
+
 		if (current_file[strlen(current_file) - 1] == '\\')
 		{
 			// New folder to be created
@@ -1003,7 +1017,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			}
 		}
 		fclose(handle_to_add);
-		strcpy(&filename_dest[1], current_file);
+		strcpy(&filename_dest[1], current_short_file_without_path);
 		res = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
 		if (res != DFS_OK)
 		{
