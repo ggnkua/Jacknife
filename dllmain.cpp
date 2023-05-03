@@ -914,30 +914,82 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	char *current_file = AddList;
 	while (*current_file) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
 	{
+		struct tm *file_tm;
+		struct _stat file_stats;
+		int file_timestamp;
+		int file_size;
+		unsigned char *read_buf;
+		size_t items_read;
+		unsigned int bytes_written;
+		if (current_file[strlen(current_file) - 1] == '\\')
+		{
+			// New folder to be created
+			current_file[strlen(current_file) - 1] = 0; // Remove the trailing '\' as to be not confused by a path
+			uint8_t *buf = (uint8_t *)calloc(1, SECTOR_SIZE * 2);
+			if (!buf) return E_ECREATE;
+			// Create the directory entry in the parent directory
+			time_t ltime;
+			time(&ltime);	// Get current date/time
+			file_tm = localtime(&ltime);
+			file_timestamp = ((file_tm->tm_year - 80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
+			res = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)current_file, DFS_WRITE | DFS_FOLDER, scratch_sector, &fi, file_timestamp);
+			if (res != DFS_OK) {
+				DFS_HostDetach(&archive_handle);
+				return E_ECREATE;
+			}
+			// Now, create the "." and ".." entries in the new folder
+			DIRENT *de = (DIRENT *)buf;
+			strcpy((char *)de->name, ".          \x10");
+			de->crtdate_h = (uint8_t)(file_timestamp >> 24);
+			de->crtdate_l = (uint8_t)(file_timestamp >> 16);
+			de->crttime_h = (uint8_t)(file_timestamp >> 8);
+			de->crttime_l = (uint8_t)file_timestamp;
+			de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
+			de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
+			de->wrttime_h = (uint8_t)(file_timestamp >> 8);
+			de->wrttime_l = (uint8_t)file_timestamp;
+			de++;
+			strcpy((char *)de->name, "..         \x10");
+			de->crtdate_h = (uint8_t)(file_timestamp >> 24);
+			de->crtdate_l = (uint8_t)(file_timestamp >> 16);
+			de->crttime_h = (uint8_t)(file_timestamp >> 8);
+			de->crttime_l = (uint8_t)file_timestamp;
+			de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
+			de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
+			de->wrttime_h = (uint8_t)(file_timestamp >> 8);
+			de->wrttime_l = (uint8_t)file_timestamp;
+			res = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, SECTOR_SIZE*2);
+			free(buf);
+			if (res != DFS_OK) {
+				DFS_HostDetach(&archive_handle);
+				return E_ECREATE;
+			}
+			// Point to next item in the list (although there probably won't be one)
+			current_file += strlen(current_file) + 2;
+			continue;
+		}
 		strcpy(filename_subpath, current_file);
 		FILE *handle_to_add=fopen(filename_source, "rb");
 		if (!handle_to_add)
 		{
 			return E_NO_FILES;
 		}
-		struct _stat file_stats;
 		_stat(filename_source, &file_stats);
-		struct tm *file_tm;
 		file_tm = localtime(&file_stats.st_mtime);
-		int file_timestamp = ((file_tm->tm_year-80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
+		file_timestamp = ((file_tm->tm_year-80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
 		fseek(handle_to_add, 0, SEEK_END);
-		int file_size = ftell(handle_to_add);
+		file_size = ftell(handle_to_add);
 		if (file_size < 0) {
 			return E_NO_FILES;
 		}
-		unsigned char *read_buf = (unsigned char *)calloc(1, file_size + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
+		read_buf = (unsigned char *)calloc(1, file_size + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
 		if (!read_buf)
 		{
 			DFS_HostDetach(&archive_handle);
 			return E_NO_MEMORY;
 		}
 		fseek(handle_to_add, 0, SEEK_SET);
-		size_t items_read = fread(read_buf, file_size, 1, handle_to_add);
+		items_read = fread(read_buf, file_size, 1, handle_to_add);
 		if (!items_read)
 		{
 			fclose(handle_to_add);
@@ -949,14 +1001,15 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		fclose(handle_to_add);
 		strcpy(&filename_dest[1], current_file);
 		res = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
-		if (res != DFS_OK) {
+		if (res != DFS_OK)
+		{
 			free(read_buf);
 			DFS_HostDetach(&archive_handle);
 			return E_ECREATE;
 		}
-		unsigned int bytes_written;
 		res = DFS_WriteFile(&fi, scratch_sector, read_buf, &bytes_written, file_size);
-		if (res != DFS_OK) {
+		if (res != DFS_OK)
+		{
 			free(read_buf);
 			DFS_HostDetach(&archive_handle);
 			return E_EWRITE;
@@ -1188,7 +1241,7 @@ void __stdcall SetProcessDataProc(myHANDLE hArcData, tProcessDataProc pProcessDa
 }
 
 int __stdcall GetPackerCaps() {
-	return PK_CAPS_BY_CONTENT | PK_CAPS_MODIFY | PK_CAPS_MULTIPLE | PK_CAPS_DELETE | PK_CAPS_NEW;
+	return PK_CAPS_SEARCHTEXT | PK_CAPS_BY_CONTENT | PK_CAPS_MODIFY | PK_CAPS_MULTIPLE | PK_CAPS_DELETE | PK_CAPS_NEW;
 }
 
 BOOL __stdcall CanYouHandleThisFile(char* FileName) {

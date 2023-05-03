@@ -11,16 +11,16 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 - Opening `.MSA` disk iamges
 - Opening `.DIM` disk images (Fastcopy & E-Copy)
 - Hard disk image support
-- Extracting files from images
-- Adding files to images
-- Deleting files from images
+- Extracting files
+- Adding files
+- Creating new folders
+- Deleting files
 - Deleting source files while adding to image (i.e. "move to archive")
 - Deleting folders recursively
 
 ### What's missing (but planned)
 
 - Creating new disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
-- Creating new folders
 - Extended (XGM) partition support
 - Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS

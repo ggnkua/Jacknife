@@ -45,6 +45,7 @@ uint32_t DFS_WriteSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_
 // File access modes
 #define DFS_READ		1			// read-only
 #define DFS_WRITE		2			// write-only
+#define DFS_FOLDER		4			// create folder (ggn)
 
 //===================================================================
 // Miscellaneous constants

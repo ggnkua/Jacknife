@@ -990,6 +990,12 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 			de.wrtdate_h = 0x34;
 		}
 
+		// ggn: If we were asked to create a folder, then let's add the folder attribute
+		if (mode & DFS_FOLDER)
+		{
+			de.attr = ATTR_DIRECTORY;
+		}
+
 		// allocate a starting cluster for the directory entry
 		cluster = DFS_GetFreeFAT(volinfo, scratch);
 
@@ -1033,6 +1039,11 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 			case FAT16:		cluster = 0xfff8;	break;
 			case FAT32:		cluster = 0x0ffffff8;	break;
 			default:		return DFS_ERRMISC;
+		}
+		// ggn: If we were asked to create a folder, the end-of-chain marker is fff/ffff/fffffff
+		if (mode & DFS_FOLDER)
+		{
+			cluster |= 7;
 		}
 		temp = 0;
 		DFS_SetFAT(volinfo, scratch, &temp, fileinfo->cluster, cluster);
