@@ -780,8 +780,10 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	}
 
 	int filename_offset = 0;
+	int partition = 0;
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
+		partition = *arch->lastEntry->fileWPath - '0';
 		// Strip out the partition path prefix (for now it's "0\", "1\", etc depending on partition)
 		filename_offset = 2;
 	}
@@ -789,7 +791,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	if (Operation == PK_EXTRACT && arch->lastEntry != NULL) {
 		uint32_t res;
 		FILEINFO fi;
-		res = DFS_OpenFile(arch->vi, (uint8_t *)arch->lastEntry->fileWPath + filename_offset, DFS_READ, scratch_sector, &fi, 0);
+		res = DFS_OpenFile(&arch->vi[partition], (uint8_t *)arch->lastEntry->fileWPath + filename_offset, DFS_READ, scratch_sector, &fi, 0);
 		if (res != DFS_OK) {
 			return E_EREAD;
 		}
@@ -861,7 +863,6 @@ int Close(tArchive* hArcData)
 	return 0;// ok
 };
 
-// TODO: totally reject long filenames for now, as DOSFS is having a really bad time with them
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
 	if (!AddList || *AddList == 0) return E_NO_FILES;
@@ -898,7 +899,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	char filename_dest[MAX_PATH];
 	if (Flags & PK_PACK_SAVE_PATHS)
 	{
-
+		// TODO
 	}
 	if (SubPath && *SubPath)
 	{
@@ -940,6 +941,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			// Now, create the "." and ".." entries in the new folder
 			DIRENT *de = (DIRENT *)buf;
 			strcpy((char *)de->name, ".          \x10");
+			// TODO: We're packing the date above and unpacking it here. A bit... suboptimal?
 			de->crtdate_h = (uint8_t)(file_timestamp >> 24);
 			de->crtdate_l = (uint8_t)(file_timestamp >> 16);
 			de->crttime_h = (uint8_t)(file_timestamp >> 8);
