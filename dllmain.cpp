@@ -11,19 +11,22 @@
 #ifdef _WIN32
 #include <windows.h>
 #define PATH_SEPARATOR "\\"
+#define FOPEN_S(a,b,c) fopen_s(&a,b,c)
 #else
 #include <unistd.h>
-#define PATH_SEPERATOR "/"
+#define PATH_SEPARATOR "/"
 #define __stdcall
 #define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
 #define strcpy_s(a,b,c) strcpy(a,c)
-#define fopen_s(a,b,c) fopen(b,c)
+#define fopen_s(a,b,c) a=fopen(b,c)
 #define _strcmpi strcasecmp
 #define BOOL int
 typedef char *LPCSTR;
 #define _stat stat
+#define _ftelli64 ftello64
 #include <signal.h>
 #define DebugBreak() raise(SIGTRAP);
+#include <ctype.h>
 #endif
 
 #include "wcxhead.h"
@@ -1040,14 +1043,14 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		}
 		if (DestPath == NULL) {
 			// DestName contains the full path and file nameand DestPath is NULL
-			FILE* f;
-			fopen_s(&f,DestName, "wb");
+			FILE *f;
+			FOPEN_S(f,DestName, "wb");
 			if (f == NULL) {
 				free(buf);
 				return E_EWRITE;
 			}
-			size_t wlen = fwrite(buf, 1, len, f);
-			if (wlen != len) {
+			size_t wlen = fwrite(buf, len, 1, f);
+			if (wlen != 1) {
 				free(buf);
 				fclose(f);
 				return E_EWRITE;
@@ -1058,14 +1061,14 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 			// DestName contains only the file name and DestPath the file path
 			char file[MAX_PATH];
 			sprintf_s(file,MAX_PATH, "%s" PATH_SEPARATOR "%s", DestPath, DestName);
-			FILE* f;
-			fopen_s(&f,file, "wb");
+			FILE *f;
+			FOPEN_S(f,file, "wb");
 			if (f == NULL) {
 				free(buf);
 				return E_EWRITE;
 			}
-			size_t wlen = fwrite(buf, 1, len, f);
-			if (wlen != len) {
+			size_t wlen = fwrite(buf, len, 1, f);
+			if (wlen != 1) {
 				free(buf);
 				fclose(f);
 				return E_EWRITE;
@@ -1188,7 +1191,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		buf = (uint8_t *)calloc(1, tracks * sides * sectors * 512);
 		if (!buf)
 		{
-			return E_OUTOFMEMORY;
+			return E_NO_MEMORY;
 		}
 
 		// TODO: initialisations are copied from STEem engine's blank images, perhaps we could make this even better?
