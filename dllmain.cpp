@@ -18,7 +18,7 @@
 #define __stdcall
 #define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
 #define strcpy_s(a,b,c) strcpy(a,c)
-#define fopen_s(a,b,c) a=fopen(b,c)
+#define FOPEN_S(a,b,c) a=fopen(b,c)
 #define _strcmpi strcasecmp
 #define BOOL int
 typedef char *LPCSTR;
