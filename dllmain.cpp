@@ -22,6 +22,8 @@
 #define BOOL int
 typedef char *LPCSTR;
 #define _stat stat
+#include <signal.h>
+#define DebugBreak() raise(SIGTRAP);
 #endif
 
 #include "wcxhead.h"
@@ -36,6 +38,237 @@ tArchive* pCurrentArchive;
 typedef tArchive* myHANDLE;
 
 DISK_IMAGE_INFO disk_image = { 0 };
+
+#ifndef _WIN32
+// The following 2 routines were lifted from https://github.com/greiman/SdFat
+// tweaked a bit to suit our needs
+
+typedef struct FatLfn
+{
+	/** UTF-16 length of Long File Name */
+	//size_t len;
+	/** Position for sequence number. */
+	uint8_t seqPos;
+	/** Flags for base and extension character case and LFN. */
+	uint8_t flags;
+	/** Short File Name */
+	uint8_t sfn[11];
+
+	const char *lfn;
+} FatLfn_t;
+
+/** name[0] value for entry that is free and no allocated entries follow */
+const uint8_t FAT_NAME_FREE = 0X00;
+/** name[0] value for entry that is free after being "deleted" */
+const uint8_t FAT_NAME_DELETED = 0XE5;
+// Directory attribute of volume label.
+const uint8_t FAT_ATTRIB_LABEL = 0x08;
+const uint8_t FAT_ATTRIB_LONG_NAME = 0X0F;
+/** Filename base-name is all lower case */
+const uint8_t FAT_CASE_LC_BASE = 0X08;
+/** Filename extension is all lower case.*/
+const uint8_t FAT_CASE_LC_EXT = 0X10;
+
+/** Derived from a LFN with loss or conversion of characters. */
+const uint8_t FNAME_FLAG_LOST_CHARS = 0X01;
+/** Base-name or extension has mixed case. */
+const uint8_t FNAME_FLAG_MIXED_CASE = 0X02;
+/** LFN entries are required for file name. */
+const uint8_t FNAME_FLAG_NEED_LFN =
+FNAME_FLAG_LOST_CHARS | FNAME_FLAG_MIXED_CASE;
+/** Filename base-name is all lower case */
+const uint8_t FNAME_FLAG_LC_BASE = FAT_CASE_LC_BASE;
+/** Filename extension is all lower case. */
+const uint8_t FNAME_FLAG_LC_EXT = FAT_CASE_LC_EXT;
+
+#define DBG_HALT_IF(b) \
+  if (b) {             \
+    DebugBreak() ; \
+  }
+
+#define DBG_HALT_MACRO DebugBreak()
+
+#define DBG_WARN_IF(b) \
+  if (b) {             \
+    printf("%d\n", __LINE__); \
+  }
+
+//------------------------------------------------------------------------------
+// Reserved characters for FAT short 8.3 names.
+inline bool sfnReservedChar(uint8_t c) {
+	if (c == '"' || c == '|' || c == '[' || c == '\\' || c == ']') {
+		return true;
+	}
+	//  *+,./ or :;<=>?
+	if ((0X2A <= c && c <= 0X2F && c != 0X2D) || (0X3A <= c && c <= 0X3F)) {
+		return true;
+	}
+	// Reserved if not in range (0X20, 0X7F).
+	return !(0X20 < c && c < 0X7F);
+}
+bool makeSFN(FatLfn_t* fname) {
+	bool is83;
+	//  char c;
+	uint8_t c;
+	uint8_t bit = FAT_CASE_LC_BASE;
+	uint8_t lc = 0;
+	uint8_t uc = 0;
+	uint8_t i = 0;
+	uint8_t in = 7;
+	const char* dot;
+	const char *end = fname->lfn + strlen(fname->lfn);
+	const char* ptr = fname->lfn;
+
+	// Assume not zero length.
+	//DBG_HALT_IF(end == ptr);
+	if (end == ptr) return false;
+	// Assume blanks removed from start and end.
+	DBG_HALT_IF(*ptr == ' ' || *(end - 1) == ' ' || *(end - 1) == '.');
+
+	// Blank file short name.
+	for (uint8_t k = 0; k < 11; k++) {
+		fname->sfn[k] = ' ';
+	}
+	// Not 8.3 if starts with dot.
+	is83 = *ptr == '.' ? false : true;
+	// Skip leading dots.
+	for (; *ptr == '.'; ptr++) {
+	}
+	// Find last dot.
+	for (dot = end - 1; dot > ptr && *dot != '.'; dot--) {
+	}
+
+	for (; ptr < end; ptr++) {
+		c = *ptr;
+		if (c == '.' && ptr == dot) {
+			in = 10;                // Max index for full 8.3 name.
+			i = 8;                  // Place for extension.
+			bit = FAT_CASE_LC_EXT;  // bit for extension.
+		} else {
+			if (sfnReservedChar(c)) {
+				is83 = false;
+				// Skip UTF-8 trailing characters.
+				if ((c & 0XC0) == 0X80) {
+					continue;
+				}
+				c = '_';
+			}
+			if (i > in) {
+				is83 = false;
+				if (in == 10 || ptr > dot) {
+					// Done - extension longer than three characters or no extension.
+					break;
+				}
+				// Skip to dot.
+				ptr = dot - 1;
+				continue;
+			}
+			//if (isLower(c)) {
+			if (islower(c)) {
+				c += 'A' - 'a';
+				lc |= bit;
+			//} else if (isUpper(c)) {
+			} else if (isupper(c)) {
+				uc |= bit;
+			}
+			fname->sfn[i++] = c;
+			if (i < 7) {
+				fname->seqPos = i;
+			}
+		}
+	}
+	if (fname->sfn[0] == ' ') {
+		DBG_HALT_MACRO;
+		{
+			int debug_halt = 0;
+		}
+		goto fail;
+	}
+	if (is83) {
+		fname->flags = (lc & uc) ? FNAME_FLAG_MIXED_CASE : lc;
+	} else {
+		fname->flags = FNAME_FLAG_LOST_CHARS;
+		fname->sfn[fname->seqPos] = '~';
+		fname->sfn[fname->seqPos + 1] = '1';
+	}
+	return true;
+
+	fail:
+		return false;
+}
+
+// ggn: Unsure if we'll go so deep into this. Generally, people shouldn't use long filenames.
+//      For now we'll probably hammer a "~1" in the filename and hope people don't try to abuse this too much
+//      (another reason for punting on this for now is that we'll have to (re)scan the current directory listing
+//      to ensure no collision happens
+
+//typedef struct {
+//	uint8_t name[11];
+//	uint8_t attributes;
+//	uint8_t caseFlags;
+//	uint8_t createTimeMs;
+//	uint8_t createTime[2];
+//	uint8_t createDate[2];
+//	uint8_t accessDate[2];
+//	uint8_t firstClusterHigh[2];
+//	uint8_t modifyTime[2];
+//	uint8_t modifyDate[2];
+//	uint8_t firstClusterLow[2];
+//	uint8_t fileSize[4];
+//} DirFat_t;
+
+//bool makeUniqueSfn(FatLfn_t* fname) {
+//	const uint8_t FIRST_HASH_SEQ = 2;  // min value is 2
+//	uint8_t pos = fname->seqPos;
+//	DirFat_t* dir;
+//	uint16_t hex = 0;
+//
+//	DBG_HALT_IF(!(fname->flags & FNAME_FLAG_LOST_CHARS));
+//	DBG_HALT_IF(fname->sfn[pos] != '~' && fname->sfn[pos + 1] != '1');
+//
+//	for (uint8_t seq = FIRST_HASH_SEQ; seq < 100; seq++) {
+//		DBG_WARN_IF(seq > FIRST_HASH_SEQ);
+//		hex += millis();
+//		if (pos > 3) {
+//			// Make space in name for ~HHHH.
+//			pos = 3;
+//		}
+//		for (uint8_t i = pos + 4; i > pos; i--) {
+//			uint8_t h = hex & 0XF;
+//			fname->sfn[i] = h < 10 ? h + '0' : h + 'A' - 10;
+//			hex >>= 4;
+//		}
+//		fname->sfn[pos] = '~';
+//		rewind();
+//		while (1) {
+//			dir = readDirCache(true);
+//			if (!dir) {
+//				if (!getError()) {
+//					// At EOF and name not found if no error.
+//					goto done;
+//				}
+//				DBG_FAIL_MACRO;
+//				goto fail;
+//			}
+//			if (dir->name[0] == FAT_NAME_FREE) {
+//				goto done;
+//			}
+//			if (isFatFileOrSubdir(dir) && !memcmp(fname->sfn, dir->name, 11)) {
+//				// Name found - try another.
+//				break;
+//			}
+//		}
+//	}
+//	// fall inti fail - too many tries.
+//	DBG_FAIL_MACRO;
+//
+//	fail:
+//		return false;
+//
+//	done:
+//		return true;
+//}
+#endif
 
 //unpack MSA into a newly created buffer
 uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
@@ -1075,6 +1308,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		size_t items_read;
 		unsigned int bytes_written;
 		char current_short_file[MAX_PATH + 1];
+		char *current_short_file_without_path;
 
 		// Because the DOSFS lib has a really bad time with long filename entries (and for good reasons)
 		// convert the filename into a 8.3 entry before using it.
@@ -1086,10 +1320,19 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		{
 			return E_NO_MEMORY;
 		}
+		current_short_file_without_path = current_short_file + strlen(SrcPath);
 #else
-		#error Have to implement GetShortPathNameA
+		FatLfn l;
+		l.lfn = filename_subpath;
+		makeSFN(&l);
+		// At this point we should probably be calling makeUniqueSfn() but eeeeeh? (look at the comments above the function for more insights)
+		// Also, turns out that the function we call generates a directory entry string (i.e. 11 chars, spaces, no dots), so
+		// we need to convert this to canonical filename here, and then DOSFS will internally re-convert this back to directory entry string.
+		// Sigh... This is (almost) the equivalent of graphics programmers converting the coordinate system multiple times inside a rendered
+		// frame because their engine or middleware makes different assumptions. Need to clean this up at some point...
+		DirToCanonical(current_short_file, l.sfn);
+		current_short_file_without_path = current_short_file;
 #endif
-		char *current_short_file_without_path = current_short_file + strlen(SrcPath);
 
 		if (current_file[strlen(current_file) - 1] == '\\')
 		{
