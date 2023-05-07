@@ -10,11 +10,11 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#define PATH_SEPARATOR "\\"
+#define PATH_SEPARATOR_STRING "\\"
 #define FOPEN_S(a,b,c) fopen_s(&a,b,c)
 #else
 #include <unistd.h>
-#define PATH_SEPARATOR "/"
+#define PATH_SEPARATOR_STRING "/"
 #define __stdcall
 #define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
 #define strcpy_s(a,b,c) strcpy(a,c)
@@ -753,7 +753,7 @@ stEntryList* findLastEntry() {
 	return entry;
 }
 
-void DirToCanonical(char dest[13], uint8_t *src)
+void dir_to_canonical(char dest[13], uint8_t *src)
 {
 	bool added_dot = false;
 	for (int i = 0; i < 11; i++)
@@ -795,7 +795,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 	char partition_prefix[16] = { 0 };
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
-		sprintf(partition_prefix, "%i" PATH_SEPARATOR, partition);
+		sprintf(partition_prefix, "%i" PATH_SEPARATOR_STRING, partition);
 	}
 
 	res = DFS_OpenDir(vi, (uint8_t *)path, &di);
@@ -808,7 +808,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 			if (lastEntry->de.name[0] == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0) continue;
-			DirToCanonical(lastEntry->filename_canonical, lastEntry->de.name);
+			dir_to_canonical(lastEntry->filename_canonical, lastEntry->de.name);
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {
 				strcpy((char *)vi->label, lastEntry->filename_canonical);
 				continue;
@@ -816,13 +816,13 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if (strlen(path) + strlen(lastEntry->filename_canonical) + 1 >= MAX_PATH ||
-					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, lastEntry->filename_canonical) == -1) {
-					res= DFS_ERRMISC;
+					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s" PATH_SEPARATOR_STRING, partition_prefix, path, lastEntry->filename_canonical) == -1) {
+					res = DFS_ERRMISC;
 					break;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
-					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR, lastEntry->filename_canonical) == -1) {
-					res=DFS_ERRMISC;
+					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR_STRING, lastEntry->filename_canonical) == -1) {
+					res = DFS_ERRMISC;
 					break;
 				}
 				lastEntry->next = new stEntryList();
@@ -1058,7 +1058,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		else {
 			// DestName contains only the file name and DestPath the file path
 			char file[MAX_PATH];
-			sprintf_s(file,MAX_PATH, "%s" PATH_SEPARATOR "%s", DestPath, DestName);
+			sprintf_s(file,MAX_PATH, "%s" PATH_SEPARATOR_STRING "%s", DestPath, DestName);
 			FILE *f;
 			FOPEN_S(f,file, "wb");
 			if (f == NULL) {
@@ -1155,7 +1155,7 @@ void convert_pathname_to_dos_path(char *src, char *dst)
 		makeSFN(&l);
 
 		// FFS this is so bad lolol
-		DirToCanonical(f, l.sfn);
+		dir_to_canonical(f, l.sfn);
 
 		f += strlen(f);
 		if (*s == DIR_SEPARATOR)
@@ -1325,7 +1325,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	if (SubPath && *SubPath)
 	{
 		strcpy(filename_dest, SubPath);
-		strcat(filename_dest, PATH_SEPARATOR);
+		strcat(filename_dest, PATH_SEPARATOR_STRING);
 	}
 	else
 	{
@@ -1532,7 +1532,7 @@ uint32_t scan_folder_and_delete(PVOLINFO vi, char *path)
 		if (de.name[0] == 0) continue;
 		if (strcmp((char *)de.name, ".          \x10") == 0) continue;
 		if (strcmp((char *)de.name, "..         \x10") == 0) continue;
-		DirToCanonical(filename_canonical, de.name);
+		dir_to_canonical(filename_canonical, de.name);
 		if (de.attr & ATTR_VOLUME_ID)
 		{
 			continue;
