@@ -42,7 +42,6 @@ typedef tArchive* myHANDLE;
 
 DISK_IMAGE_INFO disk_image;
 
-#ifndef _WIN32
 // The following 2 routines were lifted from https://github.com/greiman/SdFat
 // tweaked a bit to suit our needs
 
@@ -271,7 +270,6 @@ bool makeSFN(FatLfn_t* fname) {
 //	done:
 //		return true;
 //}
-#endif
 
 //unpack MSA into a newly created buffer
 uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
@@ -1135,6 +1133,41 @@ void pcg32_srandom_r(pcg32_random_t *rng, uint64_t initstate, uint64_t initseq)
 	pcg32_random_r(rng);
 }
 
+void convert_pathname_to_dos_path(char *src, char *dst)
+{
+	char *s = src;
+	char *e = src + strlen(src);
+	char *f = dst;
+	// sanitise any subfolders in the path
+	while (s != e)
+	{
+		char lfn[MAX_PATH-1];
+		{
+			char *l = lfn;
+			while (s != e && *s != DIR_SEPARATOR)
+			{
+				*l++ = *s++;
+			}
+			*l = 0;
+		}
+		FatLfn l;
+		l.lfn = lfn;
+		makeSFN(&l);
+
+		// FFS this is so bad lolol
+		DirToCanonical(f, l.sfn);
+
+		f += strlen(f);
+		if (*s == DIR_SEPARATOR)
+		{
+			s++;
+			*f++ = DIR_SEPARATOR;
+		}
+	}
+	*f = 0;
+
+}
+
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
 	uint32_t ret;
@@ -1296,10 +1329,11 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	}
 	else
 	{
-		strcpy(filename_dest, PATH_SEPARATOR);
+		*filename_dest = 0;
 	}
 	strcpy(filename_source, SrcPath);
 	filename_subpath = filename_source + strlen(filename_source);
+	char *filename_dest_subpath = filename_dest + strlen(filename_dest);
 	current_file = AddList;
 	while (*current_file) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
 	{
@@ -1310,49 +1344,46 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		unsigned char *read_buf;
 		size_t items_read;
 		unsigned int bytes_written;
-		char current_short_file[MAX_PATH + 1];
-		char *current_short_file_without_path;
+		char current_short_filename[MAX_PATH + 1];
 
 		// Because the DOSFS lib has a really bad time with long filename entries (and for good reasons)
 		// convert the filename into a 8.3 entry before using it.
 		// TODO: boy, this is going to be a doozy to code for non Windows systems
 		strcpy(filename_subpath, current_file);
+		strcpy(filename_dest_subpath, current_file);
+		convert_pathname_to_dos_path(filename_dest, current_short_filename);
 
-#ifdef _WIN32
-		if (!GetShortPathNameA(filename_source, current_short_file, MAX_PATH)) 
-		{
-			return E_NO_MEMORY;
-		}
-		current_short_file_without_path = current_short_file + strlen(SrcPath);
-#else
-		FatLfn l;
-		l.lfn = filename_subpath;
-		makeSFN(&l);
 		// At this point we should probably be calling makeUniqueSfn() but eeeeeh? (look at the comments above the function for more insights)
 		// Also, turns out that the function we call generates a directory entry string (i.e. 11 chars, spaces, no dots), so
 		// we need to convert this to canonical filename here, and then DOSFS will internally re-convert this back to directory entry string.
 		// Sigh... This is (almost) the equivalent of graphics programmers converting the coordinate system multiple times inside a rendered
 		// frame because their engine or middleware makes different assumptions. Need to clean this up at some point...
-		DirToCanonical(current_short_file, l.sfn);
-		current_short_file_without_path = current_short_file;
-#endif
 
-		if (current_file[strlen(current_file) - 1] == '\\')
+		if (current_file[strlen(current_file) - 1] == DIR_SEPARATOR)
 		{
 			// New folder to be created
-			current_file[strlen(current_file) - 1] = 0; // Remove the trailing '\' as to be not confused by a path
+			current_short_filename[strlen(current_short_filename) - 1] = 0; // Remove the trailing '\' as to be not confused by a path
 			uint8_t *buf = (uint8_t *)calloc(1, SECTOR_SIZE * 2);
 			if (!buf) return E_ECREATE;
+
 			// Create the directory entry in the parent directory
 			time_t ltime;
 			time(&ltime);	// Get current date/time
 			file_tm = localtime(&ltime);
 			file_timestamp = ((file_tm->tm_year - 80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
-			ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)current_file, DFS_WRITE | DFS_FOLDER, scratch_sector, &fi, file_timestamp);
+			
+			char *folder_name = current_short_filename;
+			if (strlen(folder_name)>MAX_PATH)
+			{
+				// This limit should be modified to fit TOS' filename limits
+				return E_ECREATE;
+			}
+			ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)folder_name, DFS_WRITE | DFS_FOLDER, scratch_sector, &fi, file_timestamp);
 			if (ret != DFS_OK) {
 				DFS_HostDetach(&archive_handle);
 				return E_ECREATE;
 			}
+
 			// Now, create the "." and ".." entries in the new folder
 			DIRENT *de = (DIRENT *)buf;
 			strcpy((char *)de->name, ".          \x10");
@@ -1382,11 +1413,10 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 				return E_ECREATE;
 			}
 			// Point to next item in the list (although there probably won't be one)
-			current_file += strlen(current_file) + 2;
+			current_file += strlen(current_file) + 1;
 			continue;
 		}
-		strcpy(filename_subpath, current_file);
-		FILE *handle_to_add=fopen(filename_source, "rb");
+		FILE *handle_to_add = fopen(filename_source, "rb");
 		if (!handle_to_add)
 		{
 			return E_NO_FILES;
@@ -1419,8 +1449,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			}
 		}
 		fclose(handle_to_add);
-		strcpy(&filename_dest[1], current_short_file_without_path);
-		ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)filename_dest, DFS_WRITE, scratch_sector, &fi, file_timestamp);
+		ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)current_short_filename, DFS_WRITE, scratch_sector, &fi, file_timestamp);
 		if (ret != DFS_OK)
 		{
 			free(read_buf);
