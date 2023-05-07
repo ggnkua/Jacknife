@@ -57,8 +57,8 @@ typedef struct part_info
 {
 	uint8_t active;
 	char type[4];
-	uint32_t start_sector;	// Possibly unused
-	uint32_t total_sectors;	// Possibly unused
+	uint32_t start_sector;
+	uint32_t total_sectors;				// Possibly unused
 } PART_INFO;
 
 typedef struct DISK_IMAGE_INFO_

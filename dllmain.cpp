@@ -23,7 +23,7 @@
 #define BOOL int
 typedef char *LPCSTR;
 #define _stat stat
-#define _ftelli64 ftello64
+#define _ftelli64 ftello
 #include <signal.h>
 #define DebugBreak() raise(SIGTRAP);
 #include <ctype.h>
@@ -40,7 +40,7 @@ tArchive* pCurrentArchive;
 
 typedef tArchive* myHANDLE;
 
-DISK_IMAGE_INFO disk_image = { 0 };
+DISK_IMAGE_INFO disk_image;
 
 #ifndef _WIN32
 // The following 2 routines were lifted from https://github.com/greiman/SdFat
