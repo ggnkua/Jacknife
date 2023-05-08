@@ -2,7 +2,6 @@
 //    ==>altho this would require a second build with different filenames etc - the "gibberish extension"-solution is clumsy, but easier \o/
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
-#include <cstdlib>
 #include <string.h>
 #include <assert.h>
 #include <sys/stat.h>
@@ -64,29 +63,20 @@ typedef struct FatLfn
 	const char *lfn;
 } FatLfn_t;
 
-/** name[0] value for entry that is free and no allocated entries follow */
-const uint8_t FAT_NAME_FREE = 0X00;
-/** name[0] value for entry that is free after being "deleted" */
-const uint8_t FAT_NAME_DELETED = 0XE5;
-// Directory attribute of volume label.
-const uint8_t FAT_ATTRIB_LABEL = 0x08;
-const uint8_t FAT_ATTRIB_LONG_NAME = 0X0F;
-/** Filename base-name is all lower case */
-const uint8_t FAT_CASE_LC_BASE = 0X08;
-/** Filename extension is all lower case.*/
-const uint8_t FAT_CASE_LC_EXT = 0X10;
 
-/** Derived from a LFN with loss or conversion of characters. */
-const uint8_t FNAME_FLAG_LOST_CHARS = 0X01;
-/** Base-name or extension has mixed case. */
-const uint8_t FNAME_FLAG_MIXED_CASE = 0X02;
-/** LFN entries are required for file name. */
-const uint8_t FNAME_FLAG_NEED_LFN =
-FNAME_FLAG_LOST_CHARS | FNAME_FLAG_MIXED_CASE;
-/** Filename base-name is all lower case */
-const uint8_t FNAME_FLAG_LC_BASE = FAT_CASE_LC_BASE;
-/** Filename extension is all lower case. */
-const uint8_t FNAME_FLAG_LC_EXT = FAT_CASE_LC_EXT;
+#define FAT_NAME_FREE 0X00;		/** name[0] value for entry that is free and no allocated entries follow */
+#define FAT_NAME_DELETED 0XE5;	/** name[0] value for entry that is free after being "deleted" */
+// Directory attribute of volume label.
+#define FAT_ATTRIB_LABEL 0x08;
+#define FAT_ATTRIB_LONG_NAME 0X0F;
+#define FAT_CASE_LC_BASE 0X08;	/** Filename base-name is all lower case */
+#define FAT_CASE_LC_EXT 0X10;	/** Filename extension is all lower case.*/
+
+#define FNAME_FLAG_LOST_CHARS 0X01											/** Derived from a LFN with loss or conversion of characters. */
+#define FNAME_FLAG_MIXED_CASE 0X02											/** Base-name or extension has mixed case. */
+#define FNAME_FLAG_NEED_LFN (FNAME_FLAG_LOST_CHARS | FNAME_FLAG_MIXED_CASE)	/** LFN entries are required for file name. */
+#define FNAME_FLAG_LC_BASE FAT_CASE_LC_BASE									/** Filename base-name is all lower case */
+#define FNAME_FLAG_LC_EXT FAT_CASE_LC_EXT									/** Filename extension is all lower case. */
 
 #define DBG_HALT_IF(b) \
   if (b) {             \
@@ -102,19 +92,19 @@ const uint8_t FNAME_FLAG_LC_EXT = FAT_CASE_LC_EXT;
 
 //------------------------------------------------------------------------------
 // Reserved characters for FAT short 8.3 names.
-inline bool sfnReservedChar(uint8_t c) {
+inline BOOL sfnReservedChar(uint8_t c) {
 	if (c == '"' || c == '|' || c == '[' || c == '\\' || c == ']') {
-		return true;
+		return TRUE;
 	}
 	//  *+,./ or :;<=>?
 	if ((0X2A <= c && c <= 0X2F && c != 0X2D) || (0X3A <= c && c <= 0X3F)) {
-		return true;
+		return TRUE;
 	}
 	// Reserved if not in range (0X20, 0X7F).
 	return !(0X20 < c && c < 0X7F);
 }
-bool makeSFN(FatLfn_t* fname) {
-	bool is83;
+BOOL makeSFN(FatLfn_t* fname) {
+	BOOL is83;
 	//  char c;
 	uint8_t c;
 	uint8_t bit = FAT_CASE_LC_BASE;
@@ -128,7 +118,7 @@ bool makeSFN(FatLfn_t* fname) {
 
 	// Assume not zero length.
 	//DBG_HALT_IF(end == ptr);
-	if (end == ptr) return false;
+	if (end == ptr) return FALSE;
 	// Assume blanks removed from start and end.
 	DBG_HALT_IF(*ptr == ' ' || *(end - 1) == ' ' || *(end - 1) == '.');
 
@@ -137,7 +127,7 @@ bool makeSFN(FatLfn_t* fname) {
 		fname->sfn[k] = ' ';
 	}
 	// Not 8.3 if starts with dot.
-	is83 = *ptr == '.' ? false : true;
+	is83 = *ptr == '.' ? FALSE : TRUE;
 	// Skip leading dots.
 	for (; *ptr == '.'; ptr++) {
 	}
@@ -153,7 +143,7 @@ bool makeSFN(FatLfn_t* fname) {
 			bit = FAT_CASE_LC_EXT;  // bit for extension.
 		} else {
 			if (sfnReservedChar(c)) {
-				is83 = false;
+				is83 = FALSE;
 				// Skip UTF-8 trailing characters.
 				if ((c & 0XC0) == 0X80) {
 					continue;
@@ -161,7 +151,7 @@ bool makeSFN(FatLfn_t* fname) {
 				c = '_';
 			}
 			if (i > in) {
-				is83 = false;
+				is83 = FALSE;
 				if (in == 10 || ptr > dot) {
 					// Done - extension longer than three characters or no extension.
 					break;
@@ -198,10 +188,10 @@ bool makeSFN(FatLfn_t* fname) {
 		fname->sfn[fname->seqPos] = '~';
 		fname->sfn[fname->seqPos + 1] = '1';
 	}
-	return true;
+	return TRUE;
 
 	fail:
-		return false;
+		return FALSE;
 }
 
 // ggn: Unsure if we'll go so deep into this. Generally, people shouldn't use long filenames.
@@ -224,7 +214,7 @@ bool makeSFN(FatLfn_t* fname) {
 //	uint8_t fileSize[4];
 //} DirFat_t;
 
-//bool makeUniqueSfn(FatLfn_t* fname) {
+//BOOL makeUniqueSfn(FatLfn_t* fname) {
 //	const uint8_t FIRST_HASH_SEQ = 2;  // min value is 2
 //	uint8_t pos = fname->seqPos;
 //	DirFat_t* dir;
@@ -248,7 +238,7 @@ bool makeSFN(FatLfn_t* fname) {
 //		fname->sfn[pos] = '~';
 //		rewind();
 //		while (1) {
-//			dir = readDirCache(true);
+//			dir = readDirCache(TRUE);
 //			if (!dir) {
 //				if (!getError()) {
 //					// At EOF and name not found if no error.
@@ -270,10 +260,10 @@ bool makeSFN(FatLfn_t* fname) {
 //	DBG_FAIL_MACRO;
 //
 //	fail:
-//		return false;
+//		return FALSE;
 //
 //	done:
-//		return true;
+//		return TRUE;
 //}
 
 //unpack MSA into a newly created buffer
@@ -346,12 +336,10 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize)
 	return unpackedData;
 }
 
-
-
-bool guess_size(int size)
+BOOL guess_size(int size)
 {
 	if (size % 512) {
-		return false;
+		return FALSE;
 	}
 	int tracks, sectors;
 	for (tracks = 86; tracks > 0; tracks--) {
@@ -361,23 +349,23 @@ bool guess_size(int size)
 					disk_image.image_tracks = tracks;
 					disk_image.image_sides = 2;
 					disk_image.image_sectors = sectors;
-					return true;
+					return TRUE;
 				}
 				else if ((size % (tracks * sectors * 1 * 512)) == 0) {
 					disk_image.image_tracks = tracks;
 					disk_image.image_sides = 1;
 					disk_image.image_sectors = sectors;
-					return true;
+					return TRUE;
 				}
 			}
 		}
 	}
-	return false;
+	return FALSE;
 }
 
 #define BYTE_SWAP_WORD(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
 
-unsigned char *expand_dim(bool fastcopy_header)
+unsigned char *expand_dim(BOOL fastcopy_header)
 { 
 	unsigned char *buf = (unsigned char *)calloc(1, disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides * 512);
 	unsigned char *d = buf;
@@ -466,7 +454,7 @@ uint32_t DFS_HostAttach(tArchive *arch)
 	disk_image.file_size = _ftelli64(disk_image.file_handle);
 	fseek(disk_image.file_handle, 0, SEEK_SET);
 
-	disk_image.disk_geometry_does_not_match_bpb = false;
+	disk_image.disk_geometry_does_not_match_bpb = FALSE;
 	disk_image.mode = DISKMODE_HARD_DISK;
 
 	if (disk_image.file_size > 2880 * 1024)
@@ -523,7 +511,7 @@ uint32_t DFS_HostAttach(tArchive *arch)
 				// Disk was imaged with "Get sectors" on, so we need to 
 				// expand the image to fill in the non-imaged sectors with blanks
 				disk_image.mode = DISKMODE_FCOPY_CONF_USED_SECTORS;
-				uint8_t *expanded = expand_dim(true);
+				uint8_t *expanded = expand_dim(TRUE);
 				if (!expanded)
 				{
 					return J_INALID_DIM;
@@ -799,7 +787,7 @@ stEntryList* findLastEntry() {
 // filename, i.e. "FILE.EXT"
 void dir_to_canonical(char dest[13], uint8_t *src)
 {
-	bool added_dot = false;
+	BOOL added_dot = FALSE;
 	for (int i = 0; i < 11; i++)
 	{
 		if (*src == ' ')
@@ -815,7 +803,7 @@ void dir_to_canonical(char dest[13], uint8_t *src)
 				}
 			} while (*src == ' ');
 			*dest++ = '.';
-			added_dot = true;
+			added_dot = TRUE;
 		}
 		*dest++ = *src++;
 		if (i == 7 && !added_dot && *src!=' ') *dest++ = '.';
@@ -1006,7 +994,7 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 	{
 		return NULL;
 	}
-	arch->volume_dirty = false;
+	arch->volume_dirty = FALSE;
 	strcpy_s(arch->archname,MAX_PATH, wcx_archive->ArcName);
 	pCurrentArchive = arch;
 
@@ -1232,7 +1220,7 @@ void convert_pathname_to_dos_path(char *src, char *dst)
 			}
 			*l = 0;
 		}
-		FatLfn l;
+		FatLfn_t l;
 		l.lfn = lfn;
 		makeSFN(&l);
 
@@ -1370,7 +1358,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 		disk_image.buffer = buf;
 		disk_image.file_size = tracks * sectors * sides * SECTOR_SIZE;
-		disk_image.disk_geometry_does_not_match_bpb = false;
+		disk_image.disk_geometry_does_not_match_bpb = FALSE;
 		disk_image.image_sectors = sectors;
 		disk_image.image_sides = sides;
 		disk_image.image_tracks = tracks;
@@ -1571,7 +1559,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		// Point to next file (or NULL termination)
 		current_file += strlen(current_file) + 1;
 	}
-	archive_handle.volume_dirty = true;
+	archive_handle.volume_dirty = TRUE;
 	DFS_HostDetach(&archive_handle);
 	if (Flags & PK_PACK_MOVE_FILES)
 	{
@@ -1720,16 +1708,11 @@ int Delete(char *PackedFile, char *DeleteList)
 
 		DeleteList += strlen(DeleteList) + 1;
 	}
-	archive_handle.volume_dirty = true;
+	archive_handle.volume_dirty = TRUE;
 	DFS_HostDetach(&archive_handle);
 
 	return 0; // All ok
 }
-
-#ifndef _WIN32
-extern "C"
-{
-#endif
 
 // OpenArchive should perform all necessary operations when an archive is to be opened
 myHANDLE __stdcall OpenArchive(tOpenArchiveData* ArchiveData)
@@ -1794,20 +1777,16 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 		oad.ArcName = FileName;
 		tArchive* pa = Open(&oad);
 		if (pa == NULL) {
-			return false;
+			return FALSE;
 		}
 		if (oad.OpenResult != 0) {
-			return false;
+			return FALSE;
 		}
 		Close(pa);
-		return true;
+		return TRUE;
 	}
-	return false;
+	return FALSE;
 }
-
-#ifndef _WIN32
-}
-#endif
 
 #ifdef _WIN32
 // The DLL entry point

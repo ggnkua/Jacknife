@@ -30,12 +30,12 @@ typedef enum
 	J_FAIL,
 } return_codes;
 
-typedef struct stEntryList
+typedef struct stEntryList_
 {
 	DIRENT de;
 	char fileWPath[MAX_PATH + 1];
-	stEntryList* next;
-	stEntryList* prev;
+	struct stEntryList_ *next;
+	struct stEntryList_ *prev;
 } stEntryList;
 
 typedef struct
@@ -45,8 +45,8 @@ typedef struct
 	stEntryList* currentEntry;
 	stEntryList* lastEntry;
 	FILE* fp;
-	bool volume_dirty;
-	bool pack_msa;						// Unused for now, in the future this will be a user setting to enable or disable msa packing
+	BOOL volume_dirty;
+	BOOL pack_msa;						// Unused for now, in the future this will be a user setting to enable or disable msa packing
 
 	tChangeVolProc pLocChangeVol;
 	tProcessDataProc pLocProcessData;
@@ -66,7 +66,7 @@ typedef struct DISK_IMAGE_INFO_
 	FILE	*file_handle;				// references host-side image file
 	uint8_t *buffer;					// Buffer for the above
 	int64_t	file_size;					// Size of the above buffer
-	bool	disk_geometry_does_not_match_bpb;			// See dosfs.cpp for an explanation why this even exists
+	BOOL	disk_geometry_does_not_match_bpb;			// See dosfs.cpp for an explanation why this even exists
 	int		bpb_sectors_per_track;		// Only required if the bool above is true
 	int		bpb_sides;					// Same
 	int		image_sectors;				// Derived value from image

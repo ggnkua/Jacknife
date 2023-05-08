@@ -1,8 +1,9 @@
-// File renamed to .cpp to address the craziness of mixing C and C++
 #ifndef _WIN32
 #define __stdcall	// needed for wcxhead.h
-#endif
+#else
 #define _CRT_SECURE_NO_WARNINGS
+#include <windows.h>
+#endif
 #include "../wcxhead.h"
 
 /*
@@ -247,7 +248,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 			// in recalculate_sector(), but it needs to know the imaged disk geometry, as well as the BPB disk geometry.
 			// So we need to fill in as much info as we can here, and the rest is done during disk image read.
 			// For MSA images it's easy, for .ST images we just have to do our best to guess the disk geometry from file size.
-			disk_image.disk_geometry_does_not_match_bpb = true;
+			disk_image.disk_geometry_does_not_match_bpb = TRUE;
 			disk_image.bpb_sectors_per_track = bpb_sectors_per_track;
 			disk_image.bpb_sides = sides;
 		}
