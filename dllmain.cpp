@@ -786,6 +786,9 @@ stEntryList* findLastEntry() {
 	return entry;
 }
 
+// In some parts of the code we get a filename in "directory format", i.e.
+// something like "FILE    EXT". This routine converts this to a "canonical"
+// filename, i.e. "FILE.EXT"
 void dir_to_canonical(char dest[13], uint8_t *src)
 {
 	bool added_dot = false;
@@ -891,18 +894,18 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 	return ret;
 }
 
-uint32_t OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
+uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 {
-	ArchiveData->CmtBuf = 0;
-	ArchiveData->CmtBufSize = 0;
-	ArchiveData->CmtSize = 0;
-	ArchiveData->CmtState = 0;
-	ArchiveData->OpenResult = E_NO_MEMORY;// default error type
+	wcx_archive->CmtBuf = 0;
+	wcx_archive->CmtBufSize = 0;
+	wcx_archive->CmtSize = 0;
+	wcx_archive->CmtState = 0;
+	wcx_archive->OpenResult = E_NO_MEMORY;// default error type
 
 	uint32_t ret= DFS_HostAttach(arch);
 	if (ret != J_OK)
 	{
-		ArchiveData->OpenResult = E_BAD_ARCHIVE;
+		wcx_archive->OpenResult = E_BAD_ARCHIVE;
 		return ret;
 	}
 
@@ -932,12 +935,12 @@ uint32_t OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 	{
 		if (DFS_GetVolInfo(0, scratch_sector, 0, arch->vi)) {
 			//printf("Error getting volume information\n");
-			ArchiveData->OpenResult = E_BAD_DATA;
+			wcx_archive->OpenResult = E_BAD_DATA;
 			return J_INVALID_HARD_DISK_IMAGE;
 		}
 	}
 
-	ArchiveData->OpenResult = 0;// ok
+	wcx_archive->OpenResult = 0;// ok
 
 	return J_OK;
 }
@@ -994,7 +997,7 @@ error:
 
 int NextItem(tArchive* hArcData, tHeaderData* HeaderData)
 {
-	tArchive* arch = (tArchive*)(hArcData);
+	tArchive* arch = hArcData;
 	if (arch->currentEntry->next == NULL) {
 		return E_BAD_ARCHIVE;
 	}
@@ -1199,7 +1202,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	uint32_t ret;
 	FILEINFO fi;
 	uint8_t scratch_sector[SECTOR_SIZE];
-	tOpenArchiveData archive_data = { 0 };
+	tOpenArchiveData wcx_archive = { 0 };
 	tArchive archive_handle = { 0 };
 	char filename_source[MAX_PATH];
 	char filename_dest[MAX_PATH];
@@ -1209,7 +1212,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 	if (!AddList || *AddList == 0) return E_NO_FILES;
 	strcpy(archive_handle.archname, PackedFile);
-	ret = OpenImage(&archive_data, &archive_handle);
+	ret = OpenImage(&wcx_archive, &archive_handle);
 
 	try_new_image_size:
 	if (ret == J_FILE_NOT_FOUND)
@@ -1338,7 +1341,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 	if (ret != J_OK)
 	{
-		return archive_data.OpenResult;
+		return wcx_archive.OpenResult;
 	}
 
 	int partition = 0;
@@ -1617,18 +1620,18 @@ int Delete(char *PackedFile, char *DeleteList)
 {
 	if (!DeleteList || !*DeleteList) return E_NO_FILES;
 
-	tOpenArchiveData archive_data = { 0 };
-	archive_data.ArcName = PackedFile;
+	tOpenArchiveData wcx_archive = { 0 };
 	tArchive archive_handle = { 0 };
 
+	wcx_archive.ArcName = PackedFile;
 	strcpy(archive_handle.archname, PackedFile);
-	uint32_t ret = OpenImage(&archive_data, &archive_handle);
+	
+	uint32_t ret = OpenImage(&wcx_archive, &archive_handle);
 	if (ret != J_OK)
 	{
-		return archive_data.OpenResult;
+		return wcx_archive.OpenResult;
 	}
 
-	uint32_t res;
 	uint8_t scratch_sector[SECTOR_SIZE];
 
 	while (*DeleteList) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
@@ -1648,15 +1651,15 @@ int Delete(char *PackedFile, char *DeleteList)
 			// We have to delete a folder. This is more tricky as we need to ensure that the folder
 			// is empty first. Which means we have to recursively scan and delete all the things
 			DeleteList[strlen(DeleteList) - 4] = 0; // Remove the "\*.*" postfix
-			res = scan_folder_and_delete(&archive_handle.vi[partition], DeleteList);
+			ret = scan_folder_and_delete(&archive_handle.vi[partition], DeleteList);
 			DeleteList += strlen(DeleteList) + 1; // Point to "*.*" which we chopped out above, so we can then point to the next item to delete (if any)
 		}
 		else
 		{
-			res = DFS_UnlinkFile(&archive_handle.vi[partition], (uint8_t *)DeleteList, scratch_sector);
+			ret = DFS_UnlinkFile(&archive_handle.vi[partition], (uint8_t *)DeleteList, scratch_sector);
 		}
 
-		if (res != DFS_OK)
+		if (ret != DFS_OK)
 		{
 			DFS_HostDetach(&archive_handle);
 			return E_ECLOSE;
