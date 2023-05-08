@@ -942,22 +942,21 @@ uint32_t OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
 	return J_OK;
 }
 
-tArchive* Open(tOpenArchiveData* ArchiveData)
+tArchive* Open(tOpenArchiveData* wcx_archive)
 {
 	int partitions = 1;
-	tArchive* arch = NULL;
-
-	if ((arch = new tArchive) == NULL)
+	
+	tArchive *arch = (tArchive *)calloc(1, sizeof(tArchive));
+	if (!arch)
 	{
 		return NULL;
 	}
-	memset(arch, 0, sizeof(tArchive));
 	arch->volume_dirty = false;
-	strcpy_s(arch->archname,MAX_PATH, ArchiveData->ArcName);
+	strcpy_s(arch->archname,MAX_PATH, wcx_archive->ArcName);
 	pCurrentArchive = arch;
 
 	// trying to open
-	if (OpenImage(ArchiveData, arch) != J_OK)
+	if (OpenImage(wcx_archive, arch) != J_OK)
 		goto error;
 
 	entryList.next = NULL;
@@ -965,7 +964,7 @@ tArchive* Open(tOpenArchiveData* ArchiveData)
 
 	char path[MAX_PATH + 1];
 
-	uint32_t result;
+	uint32_t ret;
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
 		partitions = MAX_PARTITIONS;
@@ -974,22 +973,22 @@ tArchive* Open(tOpenArchiveData* ArchiveData)
 	for (int i = 0; i < partitions; i++)
 	{
 		path[0] = 0;
-		result = scan_files((char *)&path, &arch->vi[i], i);
-		if (result != DFS_OK && result != DFS_EOF) {
+		ret = scan_files((char *)&path, &arch->vi[i], i);
+		if (ret != DFS_OK && ret != DFS_EOF) {
 			arch->currentEntry = &entryList;
 			arch->lastEntry = NULL;
-			ArchiveData->OpenResult = E_BAD_DATA;
+			wcx_archive->OpenResult = E_BAD_DATA;
 			return arch;
 		}
 	}
 	arch->currentEntry = &entryList;
 	arch->lastEntry = NULL;
-	ArchiveData->OpenResult = 0;// ok
+	wcx_archive->OpenResult = 0;// ok
 	return arch;
 
 error:
 	// memory must be freed
-	delete arch;
+	free(arch);
 	return NULL;
 };
 
@@ -1120,7 +1119,7 @@ int Close(tArchive* hArcData)
 		}
 		entry = entry->next;
 	}
-	delete arch;
+	free(arch);
 
 	return 0;// ok
 };
