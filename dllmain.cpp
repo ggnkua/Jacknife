@@ -371,12 +371,12 @@ bool guess_size(int size)
 
 unsigned char *expand_dim(bool fastcopy_header)
 { 
-	unsigned char *buf = (unsigned char *)malloc(disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides * 512);
+	unsigned char *buf = (unsigned char *)calloc(1, disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides * 512);
 	unsigned char *d = buf;
 	if (!d) return 0;
 	unsigned char *s = disk_image.buffer;
 
-	FCOPY_HEADER *h = (FCOPY_HEADER * )s;
+	FCOPY_HEADER *h = (FCOPY_HEADER *)s;
 	s += 32;
 
 	int total_filesystem_sectors = BYTE_SWAP_WORD(h->total_filesystem_sectors);
@@ -391,13 +391,13 @@ unsigned char *expand_dim(bool fastcopy_header)
 	unsigned char *fat1 = disk_image.buffer + 512+32 + 3; // A bit hardcoded, but eh
 	int cluster_size = BYTE_SWAP_WORD(h->cluster_size);
 
+	// TODO: remove duplicate code
 	for (int i = 0; i < BYTE_SWAP_WORD(h->total_clusters) / 2; i++)
 	{
 		// Check "even" entry in a FAT12 record
 		int fat_entry = ((fat1[1] & 0xf) << 8) | fat1[0];
 		if (fat_entry == 0 || (fat_entry >= 0xff0 && fat_entry <= 0xff7) ||bytes_left<=0)
 		{
-			memset(d, 0, 512);
 			d += cluster_size;
 		}
 		else
@@ -410,7 +410,6 @@ unsigned char *expand_dim(bool fastcopy_header)
 			{
 				// Yes, there are .dim files that are truncated at the end
 				memcpy(d, s, bytes_left);
-				memset(d + bytes_left, 0, cluster_size - bytes_left);
 			}
 			s += cluster_size;
 			d += cluster_size;
@@ -421,7 +420,6 @@ unsigned char *expand_dim(bool fastcopy_header)
 		fat_entry = (fat1[2] << 4) | (fat1[1] >> 4);
 		if (fat_entry == 0 || (fat_entry >= 0xff0 && fat_entry <= 0xff7) || bytes_left <= 0)
 		{
-			memset(d, 0, 512);
 			d += cluster_size;
 		}
 		else
@@ -434,7 +432,6 @@ unsigned char *expand_dim(bool fastcopy_header)
 			{
 				// Yes, there are .dim files that are truncated at the end
 				memcpy(d, s, bytes_left);
-				memset(d + bytes_left, 0, cluster_size - bytes_left);
 			}
 			s += cluster_size;
 			d += cluster_size;
@@ -466,15 +463,25 @@ uint32_t DFS_HostAttach(tArchive *arch)
 
 	if (disk_image.file_size > 2880 * 1024)
 	{
-		// Hard disk image, that's all we need to do
+		// Hard disk image, we'll do everything in-place inside the file
 		return J_OK;
 	}
 
-	// Definitely a disk image, let's cache it into RAM
+	// Definitely a floppy disk image, let's cache it into RAM
 	disk_image.buffer = (uint8_t *)malloc((size_t)disk_image.file_size);
-	if (!disk_image.buffer) return J_MALLOC_ERROR;
-	if (!fread(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle)) { fclose(disk_image.file_handle); return -1; }
+	if (!disk_image.buffer)
+	{
+		return J_MALLOC_ERROR;
+	}
+	if (!fread(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle))
+	{
+		fclose(disk_image.file_handle);
+		return -1;
+	}
 	fclose(disk_image.file_handle);
+	
+	// Try to figure out what kind of image we got here. We first assume it's just a sector dump (.ST)
+	// and then we scan for MSA and FastCopy DIM headers. If we detect either, go do some extra stuff
 	disk_image.mode = DISKMODE_LINEAR;
 	if ((disk_image.buffer[0] == 0xe && disk_image.buffer[1] == 0xf) ||
 		(disk_image.buffer[0] == 0x0 && disk_image.buffer[1] == 0x0 && strlen(arch->archname) > 4 && _strcmpi(arch->archname + strlen(arch->archname) - 4, ".msa") == 0))
@@ -491,7 +498,7 @@ uint32_t DFS_HostAttach(tArchive *arch)
 	}
 	else if (*(unsigned short *)disk_image.buffer == 0x4242)
 	{
-		// Fastcopy DIM image, unpack it to flat buffer
+		// Fastcopy DIM image, unpack it to flat buffer if needed
 		FCOPY_HEADER *h = (FCOPY_HEADER *)disk_image.buffer;
 		if (h->start_track)
 		{
@@ -539,6 +546,10 @@ uint32_t DFS_HostAttach(tArchive *arch)
 	return J_OK;
 }
 
+// For reasons explained in DFS_GetVolInfo, the image's geometry can be different than what
+// the BPB reports. When we detect such a case we need to translate the requested sector
+// from the "logical" geometry to the "physical" one. Basically we convert the sector to
+// track/sector/side and then convert it back to a sector count using the detected disk geometry.
 uint32_t recalculate_sector(uint32_t sector)
 {
 	uint32_t requested_track = sector / disk_image.bpb_sectors_per_track / disk_image.bpb_sides;
@@ -557,25 +568,30 @@ int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 {
 	if (disk_image.disk_geometry_does_not_match_bpb)
 	{
-		// Wonky disk image detected, let's skip the second side from the image
+		// Wonky disk image detected, let's recalculate the requested sector
 		sector = recalculate_sector(sector);
 		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
 	}
 
 	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
 	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
+	{
 		return -1;
-
+	}
+	
 	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
+		// It's cached in ram, so let's not hit the disk
 		memcpy(buffer, &disk_image.buffer[sector * SECTOR_SIZE], SECTOR_SIZE);
 		return 0;
 	}
 	else
 	{
 		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
+		{
 			return -1;
-
+		}
+		
 		fread(buffer, SECTOR_SIZE, count, disk_image.file_handle);
 		return 0;
 	}
@@ -594,15 +610,18 @@ int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 {
 	if (disk_image.disk_geometry_does_not_match_bpb)
 	{
-		// Wonky disk image detected, let's skip the second side from the image
+		// Wonky disk image detected, let's recalculate the requested sector
 		sector = recalculate_sector(sector);
 		assert(count == 1);	// Leave this here just to remind us that anything if count>1 it could mean Very Bad Things(tm)
 	}
 
 	// fseek into an opened for writing file can extend the file on Windows and won't fail, so let's check bounds
 	if ((int)(sector * SECTOR_SIZE) > disk_image.file_size)
+	{
 		return -1;
-
+	}
+	
+	// It's cached in ram, so let's not hit the disk
 	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
 		memcpy(&disk_image.buffer[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
@@ -611,7 +630,9 @@ int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 	else
 	{
 		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
+		{
 			return -1;
+		}
 
 		fwrite(buffer, SECTOR_SIZE, count, disk_image.file_handle);
 		fflush(disk_image.file_handle);
@@ -666,11 +687,11 @@ uint8_t *make_msa(tArchive *arch)
 	if (!packed_buffer) return 0;
 	unsigned char *pack = packed_buffer;
 
-	memcpy(pack + 0, "\x0e\x0f", 2);
-	*(unsigned short *)(pack + 2) = ((unsigned short)(sectors << 8)) | ((unsigned short)(sectors >> 8));
+	*(unsigned short *)(pack + 0) = 0x0f0e;
+	*(unsigned short *)(pack + 2) = ((unsigned short)(    sectors << 8)) | ((unsigned short)(    sectors >> 8));
 	*(unsigned short *)(pack + 4) = ((unsigned short)((sides - 1) << 8)) | ((unsigned short)((sides - 1) >> 8));
 	*(unsigned short *)(pack + 6) = 0; // Start track will always be 0
-	*(unsigned short *)(pack + 8) = ((unsigned short)(end_track << 8)) | ((unsigned short)(end_track >> 8));
+	*(unsigned short *)(pack + 8) = ((unsigned short)(  end_track << 8)) | ((unsigned short)(  end_track >> 8));
 	pack += 10;
 
 	int track;
@@ -700,49 +721,61 @@ uint8_t *make_msa(tArchive *arch)
 
 int DFS_HostDetach(tArchive *arch)
 {
-	if (disk_image.mode != DISKMODE_HARD_DISK)
+	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
-		if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_NO_CONF)
-		{
-			disk_image.buffer -= 32;
-		}
-		if (!arch->volume_dirty)
-		{
-			free(disk_image.buffer);
-			return 0;
-		}
-		if (disk_image.mode == DISKMODE_MSA)
-		{
-			uint8_t *packed_msa = make_msa(arch);
-			if (!packed_msa)
-			{
-				free(disk_image.buffer);
-				return -1;
-			}
-			free(disk_image.buffer);
-			disk_image.buffer = packed_msa;
-		}
-		if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
-		{
-			// Eventually here we'll just add some code to write a .dim file using "all sectors",
-			// unless someone reeeeeeeeally asks for "used sectors" format it's not happening
-		}
-		if (disk_image.mode == DISKMODE_FCOPY_NO_CONF)
-		{
-			// Unsure if the implementation is different here, it might be merged with the above block
-		}
-		disk_image.file_handle = fopen(arch->archname, "wb");
-		if (!disk_image.file_handle) return -1;
-		fwrite(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle);
-		free(disk_image.buffer);
-		fclose(disk_image.file_handle);
-		return 0;
-	}
-	else
-	{
+		// Just close the file, we're done
 		if (!disk_image.file_handle) return -1;
 		return fclose(disk_image.file_handle);
+	}		
+	
+	if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_NO_CONF)
+	{
+		// Rewind pointer here because we might want to free it
+		disk_image.buffer -= 32;
 	}
+
+	// Floppy image, we have some work to do
+	if (!arch->volume_dirty)
+	{
+		// Only try to save the image to disk if we actually modified it
+		// If we performed a file operation (add files, new folder, etc)
+		// and it failed, then we don't update the image to disk
+		free(disk_image.buffer);
+		return 0;
+	}
+	
+	if (disk_image.mode == DISKMODE_MSA)
+	{
+		uint8_t *packed_msa = make_msa(arch);
+		if (!packed_msa)
+		{
+			free(disk_image.buffer);
+			return -1;
+		}
+		free(disk_image.buffer);
+		disk_image.buffer = packed_msa;
+	}
+	
+	if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
+	{
+		// Eventually here we'll just add some code to write a .dim file using "all sectors",
+		// unless someone reeeeeeeeally asks for "used sectors" format it's not happening
+	}
+	
+	if (disk_image.mode == DISKMODE_FCOPY_NO_CONF)
+	{
+		// Unsure if the implementation is different here, it might be merged with the above block
+	}
+	
+	disk_image.file_handle = fopen(arch->archname, "wb");
+	if (!disk_image.file_handle)
+	{
+		return -1;
+	}
+	fwrite(disk_image.buffer, (size_t)disk_image.file_size, 1, disk_image.file_handle);
+	free(disk_image.buffer);
+	fclose(disk_image.file_handle);
+	return 0;	
 }
 
 stEntryList* findLastEntry() {
