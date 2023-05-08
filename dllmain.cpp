@@ -272,16 +272,19 @@ bool makeSFN(FatLfn_t* fname) {
 //}
 
 //unpack MSA into a newly created buffer
-uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
-	int sectors = ((int)packedMsa[2] << 8) | ((int)packedMsa[3]);
-	int sides = (((int)packedMsa[4] << 8) | ((int)packedMsa[5])) + 1;
-	int startTrack = ((int)packedMsa[6] << 8) | ((int)packedMsa[7]);
-	int endTrack = ((int)packedMsa[8] << 8) | ((int)packedMsa[9]);
+uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize)
+{
+	int sectors 	=  ((int)packedMsa[2] << 8) | ((int)packedMsa[3]);
+	int sides 		= (((int)packedMsa[4] << 8) | ((int)packedMsa[5])) + 1;
+	int startTrack 	=  ((int)packedMsa[6] << 8) | ((int)packedMsa[7]);
+	int endTrack 	= (((int)packedMsa[8] << 8) | ((int)packedMsa[9])) + 1;
+	
 	//just ignore partial disk images, skipping tracks would skip bpb/fat, too
 	if (startTrack != 0 || endTrack == 0) {
 		return NULL;
 	}
-	int unpackedSize = sectors * 512 * sides * (endTrack + 1);
+	
+	int unpackedSize = sectors * 512 * sides * endTrack;
 	disk_image.image_sectors = sectors;
 	disk_image.image_sides = sides;
 	disk_image.image_tracks = endTrack;
@@ -290,7 +293,7 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize) {
 
 	int offset = 10;
 	int out = 0;
-	for (int i = 0; i < (endTrack + 1) * sides; i++) {
+	for (int i = 0; i < endTrack * sides; i++) {
 		int trackLen = packedMsa[offset++];
 		trackLen <<= 8;
 		trackLen += packedMsa[offset++];
@@ -678,15 +681,15 @@ static int pack_track(unsigned char *dest, const unsigned char *src, int len) {
 uint8_t *make_msa(tArchive *arch)
 {
 	// Write MSA header
-	int sectors = disk_image.image_sectors;
-	int sides = disk_image.image_sides;
+	int sectors 	= disk_image.image_sectors;
+	int sides 		= disk_image.image_sides;
 	int start_track = 0;
-	int end_track = disk_image.image_tracks;
+	int end_track 	= disk_image.image_tracks - 1;
 
 	unsigned char *packed_buffer = (unsigned char *)malloc(10 + end_track * (sectors * SECTOR_SIZE + 2) * sides + 100000); // 10=header size, +2 bytes per track for writing the track size
 	if (!packed_buffer) return 0;
 	unsigned char *pack = packed_buffer;
-
+	
 	*(unsigned short *)(pack + 0) = 0x0f0e;
 	*(unsigned short *)(pack + 2) = ((unsigned short)(    sectors << 8)) | ((unsigned short)(    sectors >> 8));
 	*(unsigned short *)(pack + 4) = ((unsigned short)((sides - 1) << 8)) | ((unsigned short)((sides - 1) >> 8));
@@ -1002,7 +1005,7 @@ int NextItem(tArchive* hArcData, tHeaderData* HeaderData)
 		return E_BAD_ARCHIVE;
 	}
 	
-	strcpy_s(HeaderData->ArcName,MAX_PATH, arch->archname);
+	strcpy_s(HeaderData->ArcName, MAX_PATH, arch->archname);
 	strcpy_s(HeaderData->FileName, MAX_PATH, arch->currentEntry->fileWPath);
 	/*
 	0x1 Read-only file
@@ -1320,7 +1323,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		disk_image.disk_geometry_does_not_match_bpb = false;
 		disk_image.image_sectors = sectors;
 		disk_image.image_sides = sides;
-		disk_image.image_tracks = tracks - 1;
+		disk_image.image_tracks = tracks;
 
 		// Now, let DOSFS fill its internal tables
 		if (DFS_GetVolInfo(0, scratch_sector, 0, &archive_handle.vi[0])) {
