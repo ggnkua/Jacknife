@@ -30,17 +30,22 @@ typedef char *LPCSTR;
 #endif
 
 #include "wcxhead.h"
-
 #include "dosfs-1.03/dosfs.h"
 #include "jacknife.h"
 
+#define STORAGE_BYTES 65536 - sizeof(void *) - sizeof(unsigned short)
+typedef struct entrylist_storage_
+{
+	struct entrylist_storage_ *prev;
+	unsigned short current_offset;
+	unsigned char data[STORAGE_BYTES];
+} ENTRYLIST_STORAGE;
+
 stEntryList entryList;
-
 tArchive* pCurrentArchive;
-
 typedef tArchive* myHANDLE;
-
 DISK_IMAGE_INFO disk_image;
+ENTRYLIST_STORAGE *current_storage = NULL;
 
 // The following 2 routines were lifted from https://github.com/greiman/SdFat
 // tweaked a bit to suit our needs
@@ -818,6 +823,38 @@ void dir_to_canonical(char dest[13], uint8_t *src)
 	*dest = 0;
 }
 
+stEntryList *new_EntryList()
+{
+	if (!current_storage)
+	{
+		// First time run, allocate a chunk
+		current_storage = (ENTRYLIST_STORAGE *)malloc(65536);
+		if (!current_storage)
+		{
+			return NULL;
+		}
+		current_storage->prev = NULL;
+		current_storage->current_offset = 0;
+	}
+	
+	if (current_storage->current_offset + sizeof(stEntryList)>STORAGE_BYTES)
+	{
+		ENTRYLIST_STORAGE *temp = current_storage;
+		current_storage = (ENTRYLIST_STORAGE *)malloc(65536);
+		if (!current_storage)
+		{
+			return NULL;
+		}
+		current_storage->prev = temp;
+		current_storage->current_offset = 0;
+	}
+	
+	uint16_t offset = current_storage->current_offset;
+	current_storage->current_offset += sizeof(stEntryList);
+	
+	return (stEntryList *)&current_storage->data[offset];
+}
+
 uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 {
 	uint32_t ret;
@@ -865,10 +902,16 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 					ret = DFS_ERRMISC;
 					break;
 				}
-				lastEntry->next = new stEntryList();
+				stEntryList *new_item = new_EntryList();
+				if (!new_item)
+				{
+					ret = DFS_ERRMISC;
+					break;
+				}
+				lastEntry->next = new_item;
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
-				lastEntry = lastEntry->next;
+				lastEntry = new_item;
 				ret = scan_files(path, vi, partition);
 				if (ret != DFS_OK && ret != DFS_EOF)
 				{
@@ -884,10 +927,16 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 					ret = DFS_ERRMISC;
 					break;
 				}
-				lastEntry->next = new stEntryList();
+				stEntryList *new_item = new_EntryList();
+				if (!new_item)
+				{
+					ret = DFS_ERRMISC;
+					break;
+				}
+				lastEntry->next = new_item;
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
-				lastEntry = lastEntry->next;
+				lastEntry = new_item;
 			}
 		}
 	}
@@ -1115,16 +1164,17 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 
 int Close(tArchive* hArcData)
 {
-	tArchive* arch = (tArchive*)(hArcData);
+	tArchive* arch = hArcData;
 	pCurrentArchive = NULL;
 	DFS_HostDetach(arch);
-	stEntryList* entry = &entryList;
-	while (entry->next != NULL) {
-		if (entry->prev != NULL && entry->prev != &entryList) {
-			delete entry->prev;
-		}
-		entry = entry->next;
+	ENTRYLIST_STORAGE *entry = current_storage;
+	while (entry->prev != NULL) {
+		ENTRYLIST_STORAGE *temp = entry->prev;
+		free(entry);
+		entry = temp;
 	}
+	free(entry);
+	current_storage = NULL;
 	free(arch);
 
 	return 0;// ok
