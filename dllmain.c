@@ -19,13 +19,17 @@
 #define strcpy_s(a,b,c) strcpy(a,c)
 #define FOPEN_S(a,b,c) a=fopen(b,c)
 #define _strcmpi strcasecmp
-#define BOOL int
 typedef char *LPCSTR;
 #define _stat stat
 #define _ftelli64 ftello
 #include <signal.h>
 #define DebugBreak() raise(SIGTRAP);
 #include <ctype.h>
+#define TRUE true
+#define FALSE false
+#define BOOL bool
+#include <stdbool.h>
+#include <stdlib.h>
 #endif
 
 #include "wcxhead.h"

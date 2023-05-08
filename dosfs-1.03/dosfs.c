@@ -1,5 +1,8 @@
 #ifndef _WIN32
 #define __stdcall	// needed for wcxhead.h
+#define BOOL bool
+#define TRUE true
+#include <stdbool.h>
 #else
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
