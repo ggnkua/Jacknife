@@ -1007,13 +1007,6 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	if (Operation == PK_SKIP || Operation == PK_TEST) return 0;
 	tArchive *arch = hArcData;
 
-	// TODO: This is here for now to disallow people from messing up .DIM images.
-	//       It will go away eventually once we implement .DIM creation
-	if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_NO_CONF || disk_image.mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
-	{
-		return E_NOT_SUPPORTED;
-	}
-
 	int filename_offset = 0;
 	int partition = 0;
 	if (disk_image.mode == DISKMODE_HARD_DISK)
@@ -1301,6 +1294,13 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		}
 
 		ret = J_OK; // Bypass exit condition below
+	}
+
+	// TODO: This is here for now to disallow people from messing up .DIM images.
+	//       It will go away eventually once we implement .DIM creation
+	if (disk_image.mode == DISKMODE_FCOPY_CONF_ALL_SECTORS || disk_image.mode == DISKMODE_FCOPY_NO_CONF || disk_image.mode == DISKMODE_FCOPY_CONF_USED_SECTORS)
+	{
+		return E_NOT_SUPPORTED;
 	}
 
 	if (ret != J_OK)
