@@ -34,7 +34,6 @@ typedef struct stEntryList
 {
 	DIRENT de;
 	char fileWPath[MAX_PATH + 1];
-	char filename_canonical[13];
 	stEntryList* next;
 	stEntryList* prev;
 } stEntryList;

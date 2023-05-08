@@ -814,10 +814,11 @@ void dir_to_canonical(char dest[13], uint8_t *src)
 
 uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 {
-	uint32_t res;
+	uint32_t ret;
 	int i;
 	DIRINFO di;
-
+	char filename_canonical[13];
+	
 	uint8_t *scratch_sector=(uint8_t *)malloc(SECTOR_SIZE);
 	if (!scratch_sector) return DFS_ERRMISC;
 
@@ -831,39 +832,39 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 		sprintf(partition_prefix, "%i" PATH_SEPARATOR_STRING, partition);
 	}
 
-	res = DFS_OpenDir(vi, (uint8_t *)path, &di);
-	if (res == DFS_OK) {
+	ret = DFS_OpenDir(vi, (uint8_t *)path, &di);
+	if (ret == DFS_OK) {
 		i = (int)strlen(path);
 		for (;;) {
 			lastEntry = findLastEntry();
-			res = DFS_GetNext(vi, &di, &(*lastEntry).de);
-			if (res != DFS_OK) break;
+			ret = DFS_GetNext(vi, &di, &(*lastEntry).de);
+			if (ret != DFS_OK) break;
 			if (lastEntry->de.name[0] == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0) continue;
-			dir_to_canonical(lastEntry->filename_canonical, lastEntry->de.name);
+			dir_to_canonical(filename_canonical, lastEntry->de.name);
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {
-				strcpy((char *)vi->label, lastEntry->filename_canonical);
+				strcpy((char *)vi->label, filename_canonical);
 				continue;
 			}
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
-				if (strlen(path) + strlen(lastEntry->filename_canonical) + 1 >= MAX_PATH ||
-					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s" PATH_SEPARATOR_STRING, partition_prefix, path, lastEntry->filename_canonical) == -1) {
-					res = DFS_ERRMISC;
+				if (strlen(path) + strlen(filename_canonical) + 1 >= MAX_PATH ||
+					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s" PATH_SEPARATOR_STRING, partition_prefix, path, filename_canonical) == -1) {
+					ret = DFS_ERRMISC;
 					break;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
-					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR_STRING, lastEntry->filename_canonical) == -1) {
-					res = DFS_ERRMISC;
+					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR_STRING, filename_canonical) == -1) {
+					ret = DFS_ERRMISC;
 					break;
 				}
 				lastEntry->next = new stEntryList();
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
 				lastEntry = lastEntry->next;
-				res = scan_files(path, vi, partition);
-				if (res != DFS_OK && res != DFS_EOF)
+				ret = scan_files(path, vi, partition);
+				if (ret != DFS_OK && ret != DFS_EOF)
 				{
 					break;
 				}
@@ -871,10 +872,10 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 			}
 			else {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
-				if (strlen(path) + strlen(lastEntry->filename_canonical) + 1 >= MAX_PATH ||
-					sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, lastEntry->filename_canonical) == -1)
+				if (strlen(path) + strlen(filename_canonical) + 1 >= MAX_PATH ||
+					sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, filename_canonical) == -1)
 				{
-					res = DFS_ERRMISC;
+					ret = DFS_ERRMISC;
 					break;
 				}
 				lastEntry->next = new stEntryList();
@@ -887,7 +888,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 
 	free(scratch_sector);
 
-	return res;
+	return ret;
 }
 
 uint32_t OpenImage(tOpenArchiveData *ArchiveData, tArchive *arch)
