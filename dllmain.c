@@ -1087,7 +1087,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	uint8_t scratch_sector[SECTOR_SIZE];
 	if (Operation == PK_SKIP || Operation == PK_TEST) return 0;
 	tArchive *arch = hArcData;
-	BOOL abort;
+	BOOL abort = FALSE;
 
 	int filename_offset = 0;
 	int partition = 0;
@@ -1265,7 +1265,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	char *filename_subpath;
 	char *current_file;
 	int create_new_disk_image_type = 0;
-	BOOL abort;
+	BOOL abort = FALSE;
 
 	if (!AddList || *AddList == 0) return E_NO_FILES;
 	strcpy(archive_handle.archname, PackedFile);
@@ -1617,7 +1617,7 @@ uint32_t scan_folder_and_delete(PVOLINFO vi, char *path)
 	ret = DFS_OpenDir(vi, (uint8_t *)path, di);
 	if (ret != DFS_OK) return ret;
 	char filename_canonical[13];
-	BOOL abort;
+	BOOL abort = FALSE;
 	DIRENT de;
 
 	do
@@ -1692,7 +1692,7 @@ int Delete(char *PackedFile, char *DeleteList)
 	wcx_archive.ArcName = PackedFile;
 	strcpy(archive_handle.archname, PackedFile);
 	
-	BOOL abort;
+	BOOL abort = FALSE;
 
 	uint32_t ret = OpenImage(&wcx_archive, &archive_handle);
 	if (ret != J_OK)
