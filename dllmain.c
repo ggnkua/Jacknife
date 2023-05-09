@@ -49,6 +49,7 @@ tArchive* pCurrentArchive;
 typedef tArchive* myHANDLE;
 DISK_IMAGE_INFO disk_image;
 ENTRYLIST_STORAGE *current_storage = NULL;
+tProcessDataProc ProcessDataProc;
 
 // The following 2 routines were lifted from https://github.com/greiman/SdFat
 // tweaked a bit to suit our needs
@@ -1086,6 +1087,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	uint8_t scratch_sector[SECTOR_SIZE];
 	if (Operation == PK_SKIP || Operation == PK_TEST) return 0;
 	tArchive *arch = hArcData;
+	BOOL abort;
 
 	int filename_offset = 0;
 	int partition = 0;
@@ -1112,6 +1114,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 			free(buf);
 			return E_EREAD;
 		}
+		// TODO: combine the code into one path?
 		if (DestPath == NULL) {
 			// DestName contains the full path and file nameand DestPath is NULL
 			FILE *f;
@@ -1121,6 +1124,10 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 				return E_EWRITE;
 			}
 			size_t wlen = fwrite(buf, len, 1, f);
+			if (ProcessDataProc)
+			{
+				abort = !ProcessDataProc(DestName, len);
+			}
 			if (wlen != 1) {
 				free(buf);
 				fclose(f);
@@ -1139,6 +1146,10 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 				return E_EWRITE;
 			}
 			size_t wlen = fwrite(buf, len, 1, f);
+			if (ProcessDataProc)
+			{
+				abort = !ProcessDataProc(file, len);
+			}
 			if (wlen != 1) {
 				free(buf);
 				fclose(f);
@@ -1254,6 +1265,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	char *filename_subpath;
 	char *current_file;
 	int create_new_disk_image_type = 0;
+	BOOL abort;
 
 	if (!AddList || *AddList == 0) return E_NO_FILES;
 	strcpy(archive_handle.archname, PackedFile);
@@ -1553,7 +1565,11 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			DFS_HostDetach(&archive_handle);
 			return E_TOO_MANY_FILES;
 		}
-		if (ret != DFS_OK)
+		if (ProcessDataProc)
+		{
+			abort = !ProcessDataProc(current_file, file_size);
+		}
+		if (ret != DFS_OK || abort)
 		{
 			free(read_buf);
 			DFS_HostDetach(&archive_handle);
@@ -1601,7 +1617,7 @@ uint32_t scan_folder_and_delete(PVOLINFO vi, char *path)
 	ret = DFS_OpenDir(vi, (uint8_t *)path, di);
 	if (ret != DFS_OK) return ret;
 	char filename_canonical[13];
-
+	BOOL abort;
 	DIRENT de;
 
 	do
@@ -1641,7 +1657,12 @@ uint32_t scan_folder_and_delete(PVOLINFO vi, char *path)
 			}
 
 			ret = DFS_UnlinkFile(vi, filename_to_delete, scratch_delete);
-			if (ret != DFS_OK)
+			if (ProcessDataProc)
+			{
+				abort = !ProcessDataProc(filename_to_delete, 0);
+			}
+
+			if (ret != DFS_OK || abort)
 			{
 				break;
 			}
@@ -1671,6 +1692,8 @@ int Delete(char *PackedFile, char *DeleteList)
 	wcx_archive.ArcName = PackedFile;
 	strcpy(archive_handle.archname, PackedFile);
 	
+	BOOL abort;
+
 	uint32_t ret = OpenImage(&wcx_archive, &archive_handle);
 	if (ret != J_OK)
 	{
@@ -1704,7 +1727,12 @@ int Delete(char *PackedFile, char *DeleteList)
 			ret = DFS_UnlinkFile(&archive_handle.vi[partition], (uint8_t *)DeleteList, scratch_sector);
 		}
 
-		if (ret != DFS_OK)
+		if (ProcessDataProc)
+		{
+			abort = !ProcessDataProc(DeleteList, 0);
+		}
+
+		if (ret != DFS_OK || abort)
 		{
 			DFS_HostDetach(&archive_handle);
 			return E_ECLOSE;
@@ -1763,7 +1791,7 @@ void __stdcall SetChangeVolProc(myHANDLE hArcData, tChangeVolProc pChangeVolProc
 // This function allows you to notify user about the progress when you un/pack files
 void __stdcall SetProcessDataProc(myHANDLE hArcData, tProcessDataProc pProcessDataProc)
 {
-//	IMG_SetCallBackProc(hArcData, pProcessDataProc);
+	ProcessDataProc = pProcessDataProc;
 }
 
 int __stdcall GetPackerCaps() {
