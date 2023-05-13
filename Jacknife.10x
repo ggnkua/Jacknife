@@ -8,7 +8,7 @@
 		<ShowEmptyFolders>true</ShowEmptyFolders>
 		<IsVirtual>false</IsVirtual>
 		<IsFolder>false</IsFolder>
-		<BuildCommand>c:\msys64\mingw64\bin\g++ $(WorkspaceDirectory)\dllmain.cpp $(WorkspaceDirectory)\dosfs-1.03\dosfs.cpp -shared -fpic -fpermissive -o $(WorkspaceDirectory)\jacknife.wcx</BuildCommand>
+		<BuildCommand>c:\msys64\mingw64\bin\gcc -O2 $(WorkspaceDirectory)\dllmain.c $(WorkspaceDirectory)\dosfs-1.03\dosfs.c -shared -fpic -o $(WorkspaceDirectory)\jacknife.wcx</BuildCommand>
 		<RebuildCommand></RebuildCommand>
 		<BuildFileCommand></BuildFileCommand>
 		<CleanCommand></CleanCommand>

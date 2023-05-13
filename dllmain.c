@@ -32,6 +32,12 @@ typedef char *LPCSTR;
 #include <stdlib.h>
 #endif
 
+#if _MSC_VER
+#define INLINE __forceinline
+#else
+#define INLINE static inline
+#endif
+
 #include "wcxhead.h"
 #include "dosfs-1.03/dosfs.h"
 #include "jacknife.h"
@@ -109,7 +115,7 @@ inline BOOL sfnReservedChar(uint8_t c) {
 	// Reserved if not in range (0X20, 0X7F).
 	return !(0X20 < c && c < 0X7F);
 }
-BOOL makeSFN(FatLfn_t* fname) {
+INLINE BOOL makeSFN(FatLfn_t* fname) {
 	BOOL is83;
 	//  char c;
 	uint8_t c;
