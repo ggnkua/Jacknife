@@ -50,6 +50,7 @@ typedef tArchive* myHANDLE;
 DISK_IMAGE_INFO disk_image;
 ENTRYLIST_STORAGE *current_storage = NULL;
 tProcessDataProc ProcessDataProc;
+int current_partition; // TODO: terrible, find some better way!
 
 // The following 2 routines were lifted from https://github.com/greiman/SdFat
 // tweaked a bit to suit our needs
@@ -588,6 +589,12 @@ int DFS_HostReadSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 	}
 	else
 	{
+		// TODO: what in the world is this abomination of a test? Simplify
+		if (current_partition!=-1 && disk_image.partition_info[current_partition].partition_defined && (sector<disk_image.partition_info[current_partition].start_sector || sector>disk_image.partition_info[current_partition].start_sector + disk_image.partition_info[current_partition].total_sectors))
+		{
+			return -1;
+		}
+
 		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
 		{
 			return -1;
@@ -630,6 +637,12 @@ int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 	}
 	else
 	{
+		// TODO: what in the world is this abomination of a test? Simplify
+		if (current_partition != -1 && disk_image.partition_info[current_partition].partition_defined && (sector<disk_image.partition_info[current_partition].start_sector || sector>disk_image.partition_info[current_partition].start_sector + disk_image.partition_info[current_partition].total_sectors))
+		{
+			return -1;
+		}
+
 		if (fseek(disk_image.file_handle, sector * SECTOR_SIZE, SEEK_SET))
 		{
 			return -1;
@@ -874,6 +887,10 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 		for (;;) {
 			lastEntry = findLastEntry();
 			ret = DFS_GetNext(vi, &di, &(*lastEntry).de);
+			if (lastEntry->de.name[0] == 'S' && lastEntry->de.name[1] == 'R' && lastEntry->de.name[2] == 'S')
+			{
+				int k = 42;
+			}
 			if (ret != DFS_OK) break;
 			if (lastEntry->de.name[0] == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
@@ -933,7 +950,10 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 			}
 		}
 	}
-
+	else
+	{
+		int k = 42;
+	}
 	free(scratch_sector);
 
 	return ret;
@@ -961,8 +981,10 @@ uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 	{
 		PART_INFO *p = disk_image.partition_info;
 		VOLINFO *a = arch->vi;
+		current_partition = -1; // Skip partition limit checks for this
 		for (int i = 0; i < MAX_PARTITIONS; i++)
 		{
+			p->partition_defined = TRUE;
 			p->start_sector = DFS_GetPtnStart(0, scratch_sector, i, &p->active, (uint8_t *)p->type, &p->total_sectors);
 			if (p->start_sector == 0xffffffff)
 			{
@@ -970,8 +992,15 @@ uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 				//printf("Cannot find first partition\n");
 				//return false;
 				// TODO: check if all partitions are bad and error out
+				p->partition_defined = FALSE;
 			}
 			DFS_GetVolInfo(0, scratch_sector, p->start_sector, a);
+			if (p->start_sector == 0)
+			{
+				// Not a partition, mark it as such
+				// TODO better checks?
+				p->partition_defined = FALSE;
+			}
 			p++;
 			a++;
 		}
@@ -1020,6 +1049,7 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 
 	for (int i = 0; i < partitions; i++)
 	{
+		current_partition = i;
 		path[0] = 0;
 		ret = scan_files((char *)&path, &arch->vi[i], i);
 		if (ret != DFS_OK && ret != DFS_EOF) {
@@ -1097,6 +1127,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		// Strip out the partition path prefix (for now it's "0\", "1\", etc depending on partition)
 		filename_offset = 2;
 	}
+	current_partition = partition;
 
 	if (Operation == PK_EXTRACT && arch->lastEntry != NULL) {
 		uint32_t res;
@@ -1415,6 +1446,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
 		SubPath += 2;
 	}
+	current_partition = partition;
 
 	if (Flags & PK_PACK_SAVE_PATHS)
 	{
@@ -1461,7 +1493,10 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			// New folder to be created
 			current_short_filename[strlen(current_short_filename) - 1] = 0; // Remove the trailing '\' as to be not confused by a path
 			uint8_t *buf = (uint8_t *)calloc(1, SECTOR_SIZE * 2);
-			if (!buf) return E_ECREATE;
+			if (!buf)
+			{
+				return E_ECREATE;
+			}
 
 			// Create the directory entry in the parent directory
 			time_t ltime;
@@ -1484,25 +1519,30 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			// Now, create the "." and ".." entries in the new folder
 			DIRENT *de = (DIRENT *)buf;
 			strcpy((char *)de->name, ".          \x10");
-			// TODO: We're packing the date above and unpacking it here. A bit... suboptimal?
-			de->crtdate_h = (uint8_t)(file_timestamp >> 24);
-			de->crtdate_l = (uint8_t)(file_timestamp >> 16);
-			de->crttime_h = (uint8_t)(file_timestamp >> 8);
-			de->crttime_l = (uint8_t)file_timestamp;
+			// TODO: Root folders and sub-folder folders have different rules
+			//       on what cluster number(s) get encoded in their "." and ".." entries
+			//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
+			//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
+			//de->crttime_h = (uint8_t)(file_timestamp >> 8);
+			//de->crttime_l = (uint8_t)file_timestamp;
 			de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
 			de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
 			de->wrttime_h = (uint8_t)(file_timestamp >> 8);
 			de->wrttime_l = (uint8_t)file_timestamp;
+			de->startclus_l_l = fi.cluster & 0xff;
+			de->startclus_l_h = (fi.cluster & 0xff00) >> 8;
+			de->startclus_h_l = (fi.cluster & 0xff0000) >> 16;
+			de->startclus_h_h = (fi.cluster & 0xff000000) >> 24;
 			de++;
 			strcpy((char *)de->name, "..         \x10");
-			de->crtdate_h = (uint8_t)(file_timestamp >> 24);
-			de->crtdate_l = (uint8_t)(file_timestamp >> 16);
-			de->crttime_h = (uint8_t)(file_timestamp >> 8);
-			de->crttime_l = (uint8_t)file_timestamp;
-			de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
-			de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
-			de->wrttime_h = (uint8_t)(file_timestamp >> 8);
-			de->wrttime_l = (uint8_t)file_timestamp;
+			//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
+			//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
+			//de->crttime_h = (uint8_t)(file_timestamp >> 8);
+			//de->crttime_l = (uint8_t)file_timestamp;
+			//de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
+			//de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
+			//de->wrttime_h = (uint8_t)(file_timestamp >> 8);
+			//de->wrttime_l = (uint8_t)file_timestamp;
 			ret = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, SECTOR_SIZE*2);
 			free(buf);
 			if (ret != DFS_OK) {
@@ -1717,6 +1757,7 @@ int Delete(char *PackedFile, char *DeleteList)
 			// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
 			DeleteList += 2;
 		}
+		current_partition = partition;
 
 		if (strlen(DeleteList) > 4 && strcmp(&DeleteList[strlen(DeleteList) - 3], "*.*") == 0)
 		{

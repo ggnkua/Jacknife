@@ -722,6 +722,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 {
 	uint32_t tempint;	// required by DFS_GetFAT
+	uint32_t tempcluster;	// ggn: protection against end of directory entries
 
 	// Do we need to read the next sector of the directory?
 	if (dirinfo->currententry >= SECTOR_SIZE / sizeof(DIRENT)) {
@@ -761,7 +762,28 @@ uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 					else
 						return DFS_ALLOCNEW;
 				}
-				dirinfo->currentcluster = DFS_GetFAT(volinfo, dirinfo->scratch, &tempint, dirinfo->currentcluster);
+				// ggn: we can't just assign the result directly because we might get an end-of-directory
+				//      marker and the caller might need dirinfo->currentcluster's last valid value.
+				//dirinfo->currentcluster = DFS_GetFAT(volinfo, dirinfo->scratch, &tempint, dirinfo->currentcluster);
+				tempcluster = DFS_GetFAT(volinfo, dirinfo->scratch, &tempint, dirinfo->currentcluster);
+				// ggn: Handle (hopefully) a corner case of the directory having all its clusters' worth of entries
+				//      filled completely. 
+				if ((volinfo->filesystem == FAT12 && tempcluster == 0x00000fff) ||
+					(volinfo->filesystem == FAT16 && tempcluster == 0x0000ffff) ||
+					(volinfo->filesystem == FAT32 && tempcluster == 0xffffffff))
+				{
+					// We are at the end of the directory chain. If this is a normal
+					// find operation, we should indicate that there is nothing more
+					// to see.
+					if (!(dirinfo->flags & DFS_DI_BLANKENT))
+						return DFS_EOF;
+
+					// On the other hand, if this is a "find free entry" search,
+					// we need to tell the caller to allocate a new cluster
+					else
+						return DFS_ALLOCNEW;
+				}
+				dirinfo->currentcluster = tempcluster;
 			}
 			if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->dataarea + ((dirinfo->currentcluster - 2) * volinfo->secperclus) + dirinfo->currentsector, 1))
 				return DFS_ERRMISC;
@@ -808,7 +830,7 @@ uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 	Returns DFS_ERRMISC if a new entry could not be located or created
 	de is updated with the same return information you would expect from DFS_GetNext
 */
-uint32_t DFS_GetFreeDirEnt(PVOLINFO volinfo, uint8_t *path, PDIRINFO di, PDIRENT de)
+uint32_t DFS_GetFreeDirEnt(PVOLINFO volinfo, uint8_t *path, PDIRINFO di, PDIRENT de, uint8_t mode)
 {
 	uint32_t tempclus,i;
 
@@ -835,6 +857,11 @@ uint32_t DFS_GetFreeDirEnt(PVOLINFO volinfo, uint8_t *path, PDIRINFO di, PDIRENT
 			
 		else if (tempclus == DFS_ALLOCNEW) {
 			tempclus = DFS_GetFreeFAT(volinfo, di->scratch);
+			// ggn: ????? gemdos seems to do that in my example
+			if (mode & DFS_FOLDER)
+			{
+				tempclus++; 
+			}
 			if (tempclus == 0x0ffffff7)
 				return DFS_ERRMISC;
 
@@ -860,7 +887,20 @@ uint32_t DFS_GetFreeDirEnt(PVOLINFO volinfo, uint8_t *path, PDIRINFO di, PDIRENT
 				case FAT32:		tempclus = 0x0ffffff8;	break;
 				default:		return DFS_ERRMISC;
 			}
+			// ggn: If we were asked to create a folder, the end-of-chain marker is fff/ffff/fffffff
+			if (mode & DFS_FOLDER)
+			{
+				tempclus |= 7;
+				// ggn: ?
+				//tempclus = 0;
+				di->currententry = 0;
+			}
 			DFS_SetFAT(volinfo, di->scratch, &i, di->currentcluster, tempclus);
+			if (mode & DFS_FOLDER)
+			{
+				return DFS_OK;
+			}
+
 		}
 	} while (!tempclus);
 
@@ -969,7 +1009,7 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 		uint32_t cluster, temp;
 
 		// Locate or create a directory entry for this file
-		if (DFS_OK != DFS_GetFreeDirEnt(volinfo, tmppath, &di, &de))
+		if (DFS_OK != DFS_GetFreeDirEnt(volinfo, tmppath, &di, &de, mode))
 			return DFS_ERRMISC;
 
 		// put sane values in the directory entry
