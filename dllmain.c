@@ -1223,6 +1223,11 @@ void convert_pathname_to_dos_path(char *src, char *dst)
 	char *s = src;
 	char *e = src + strlen(src);
 	char *f = dst;
+	if (*s == DIR_SEPARATOR)
+	{
+		// Eat leading dir separator as we will end up with a duff folder name
+		s++;
+	}
 	// sanitise any subfolders in the path
 	while (s != e)
 	{
@@ -1408,7 +1413,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		partition = *SubPath - '0';
 
 		// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
-		SubPath++;
+		SubPath += 2;
 	}
 
 	if (Flags & PK_PACK_SAVE_PATHS)
@@ -1441,7 +1446,6 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 		// Because the DOSFS lib has a really bad time with long filename entries (and for good reasons)
 		// convert the filename into a 8.3 entry before using it.
-		// TODO: boy, this is going to be a doozy to code for non Windows systems
 		strcpy(filename_subpath, current_file);
 		strcpy(filename_dest_subpath, current_file);
 		convert_pathname_to_dos_path(filename_dest, current_short_filename);
@@ -1466,7 +1470,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			file_timestamp = ((file_tm->tm_year - 80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
 			
 			char *folder_name = current_short_filename;
-			if (strlen(folder_name)>MAX_PATH)
+			if (strlen(folder_name) > MAX_PATH)
 			{
 				// This limit should be modified to fit TOS' filename limits
 				return E_ECREATE;

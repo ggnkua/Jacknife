@@ -517,8 +517,11 @@ uint32_t DFS_SetFAT(PVOLINFO volinfo, uint8_t *scratch, uint32_t *scratchcache, 
 		scratch[offset+1] = (new_contents & 0xff00) >> 8;
 		result = DFS_WriteSector(volinfo->unit, scratch, *scratchcache, 1);
 		// mirror the FAT into copy 2
+		// ggn: the commented line did not take into account sectors > 512 bytes (i.e. hard disk images)
+		//      TODO: explain why we need to divide volinfo->secperclus/2, this matches what GEMDOS does
 		if (DFS_OK == result)
-			result = DFS_WriteSector(volinfo->unit, scratch, (*scratchcache)+volinfo->secperfat, 1);
+			//result = DFS_WriteSector(volinfo->unit, scratch, (*scratchcache)+volinfo->secperfat, 1);
+			result = DFS_WriteSector(volinfo->unit, scratch, (*scratchcache) + volinfo->secperfat * volinfo->secperclus/2, 1);
 	}
 	else if (volinfo->filesystem == FAT32) {
 		scratch[offset] = (new_contents & 0xff);
@@ -530,8 +533,11 @@ uint32_t DFS_SetFAT(PVOLINFO volinfo, uint8_t *scratch, uint32_t *scratchcache, 
 		// for; in every example I've encountered they are always zero.
 		result = DFS_WriteSector(volinfo->unit, scratch, *scratchcache, 1);
 		// mirror the FAT into copy 2
+		// ggn: the commented line did not take into account sectors > 512 bytes (i.e. hard disk images)
+		//      TODO: explain why we need to divide volinfo->secperclus/2, this matches what GEMDOS does
 		if (DFS_OK == result)
-			result = DFS_WriteSector(volinfo->unit, scratch, (*scratchcache)+volinfo->secperfat, 1);
+			//result = DFS_WriteSector(volinfo->unit, scratch, (*scratchcache)+volinfo->secperfat, 1);
+			result = DFS_WriteSector(volinfo->unit, scratch, (*scratchcache) + volinfo->secperfat * volinfo->secperclus/2, 1);
 	}
 	else
 		result = DFS_ERRMISC;
@@ -1443,10 +1449,14 @@ uint32_t DFS_WriteFile(PFILEINFO fileinfo, uint8_t *scratch, uint8_t *buffer, ui
 	// Update directory entry
 		if (DFS_ReadSector(fileinfo->volinfo->unit, scratch, fileinfo->dirsector, 1))
 			return DFS_ERRMISC;
-		((PDIRENT) scratch)[fileinfo->diroffset].filesize_0 = fileinfo->filelen & 0xff;
-		((PDIRENT) scratch)[fileinfo->diroffset].filesize_1 = (fileinfo->filelen & 0xff00) >> 8;
-		((PDIRENT) scratch)[fileinfo->diroffset].filesize_2 = (fileinfo->filelen & 0xff0000) >> 16;
-		((PDIRENT) scratch)[fileinfo->diroffset].filesize_3 = (fileinfo->filelen & 0xff000000) >> 24;
+		// ggn: Don't write file size on a folder entry, that's silly
+		if (!(fileinfo->mode & DFS_FOLDER))
+		{
+			((PDIRENT)scratch)[fileinfo->diroffset].filesize_0 = fileinfo->filelen & 0xff;
+			((PDIRENT)scratch)[fileinfo->diroffset].filesize_1 = (fileinfo->filelen & 0xff00) >> 8;
+			((PDIRENT)scratch)[fileinfo->diroffset].filesize_2 = (fileinfo->filelen & 0xff0000) >> 16;
+			((PDIRENT)scratch)[fileinfo->diroffset].filesize_3 = (fileinfo->filelen & 0xff000000) >> 24;
+		}
 		if (DFS_WriteSector(fileinfo->volinfo->unit, scratch, fileinfo->dirsector, 1))
 			return DFS_ERRMISC;
 	return result;
