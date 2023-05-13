@@ -9,11 +9,11 @@
 
 #ifdef _WIN32
 #include <windows.h>
-#define PATH_SEPARATOR_STRING "\\"
+#define DIR_SEPARATOR_STRING "\\"
 #define FOPEN_S(a,b,c) fopen_s(&a,b,c)
 #else
 #include <unistd.h>
-#define PATH_SEPARATOR_STRING "/"
+#define DIR_SEPARATOR_STRING "/"
 #define __stdcall
 #define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
 #define strcpy_s(a,b,c) strcpy(a,c)
@@ -878,7 +878,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 	char partition_prefix[16] = { 0 };
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
-		sprintf(partition_prefix, "%i" PATH_SEPARATOR_STRING, partition);
+		sprintf(partition_prefix, "%i" DIR_SEPARATOR_STRING, partition);
 	}
 
 	ret = DFS_OpenDir(vi, (uint8_t *)path, &di);
@@ -903,12 +903,12 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if (strlen(path) + strlen(filename_canonical) + 1 >= MAX_PATH ||
-					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s" PATH_SEPARATOR_STRING, partition_prefix, path, filename_canonical) == -1) {
+					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s" DIR_SEPARATOR_STRING, partition_prefix, path, filename_canonical) == -1) {
 					ret = DFS_ERRMISC;
 					break;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
-					sprintf_s(&path[i], MAX_PATH - i, "%s" PATH_SEPARATOR_STRING, filename_canonical) == -1) {
+					sprintf_s(&path[i], MAX_PATH - i, "%s" DIR_SEPARATOR_STRING, filename_canonical) == -1) {
 					ret = DFS_ERRMISC;
 					break;
 				}
@@ -1169,7 +1169,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		else {
 			// DestName contains only the file name and DestPath the file path
 			char file[MAX_PATH];
-			sprintf_s(file,MAX_PATH, "%s" PATH_SEPARATOR_STRING "%s", DestPath, DestName);
+			sprintf_s(file,MAX_PATH, "%s" DIR_SEPARATOR_STRING "%s", DestPath, DestName);
 			FILE *f;
 			FOPEN_S(f,file, "wb");
 			if (f == NULL) {
@@ -1444,7 +1444,11 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		partition = *SubPath - '0';
 
 		// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
-		SubPath += 2;
+		SubPath ++;
+		if (*SubPath == DIR_SEPARATOR)
+		{
+			SubPath++;
+		}
 	}
 	current_partition = partition;
 
@@ -1455,7 +1459,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	if (SubPath && *SubPath)
 	{
 		strcpy(filename_dest, SubPath);
-		strcat(filename_dest, PATH_SEPARATOR_STRING);
+		strcat(filename_dest, DIR_SEPARATOR_STRING);
 	}
 	else
 	{
