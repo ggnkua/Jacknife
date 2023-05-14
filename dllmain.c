@@ -34,7 +34,7 @@ typedef char *LPCSTR;
 
 #if _MSC_VER
 #define INLINE __forceinline
-#elif defined((__APPLE__)
+#elif defined(__APPLE__)
 #define INLINE
 #else
 #define INLINE static inline
@@ -1530,7 +1530,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 			// Now, create the "." and ".." entries in the new folder
 			DIRENT *de = (DIRENT *)buf;
-			memcpy((char *)de->name, ".          ");
+			memcpy((char *)de->name, ".          ", 11);
 			// This used to be a part of the string above. But OSX thinks that this is 
 			// not good for some reason and crashes? *Shrudder*
 			de->attr = ATTR_DIRECTORY;
@@ -1549,7 +1549,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			de->startclus_h_l = (fi.cluster & 0xff0000) >> 16;
 			de->startclus_h_h = (fi.cluster & 0xff000000) >> 24;
 			de++;
-			memcpy((char *)de->name, "..         ");
+			memcpy((char *)de->name, "..         ", 11);
 			de->attr = ATTR_DIRECTORY;
 			//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
 			//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
