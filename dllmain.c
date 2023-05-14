@@ -34,6 +34,8 @@ typedef char *LPCSTR;
 
 #if _MSC_VER
 #define INLINE __forceinline
+#elif defined((__APPLE__)
+#define INLINE
 #else
 #define INLINE static inline
 #endif
@@ -1528,7 +1530,10 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 
 			// Now, create the "." and ".." entries in the new folder
 			DIRENT *de = (DIRENT *)buf;
-			strcpy((char *)de->name, ".          \x10");
+			memcpy((char *)de->name, ".          ");
+			// This used to be a part of the string above. But OSX thinks that this is 
+			// not good for some reason and crashes? *Shrudder*
+			de->attr = ATTR_DIRECTORY;
 			// TODO: Root folders and sub-folder folders have different rules
 			//       on what cluster number(s) get encoded in their "." and ".." entries
 			//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
@@ -1544,7 +1549,8 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			de->startclus_h_l = (fi.cluster & 0xff0000) >> 16;
 			de->startclus_h_h = (fi.cluster & 0xff000000) >> 24;
 			de++;
-			strcpy((char *)de->name, "..         \x10");
+			memcpy((char *)de->name, "..         ");
+			de->attr = ATTR_DIRECTORY;
 			//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
 			//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
 			//de->crttime_h = (uint8_t)(file_timestamp >> 8);
