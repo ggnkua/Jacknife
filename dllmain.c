@@ -106,7 +106,7 @@ typedef struct FatLfn
 
 //------------------------------------------------------------------------------
 // Reserved characters for FAT short 8.3 names.
-inline BOOL sfnReservedChar(uint8_t c) {
+INLINE BOOL sfnReservedChar(uint8_t c) {
 	if (c == '"' || c == '|' || c == '[' || c == '\\' || c == ']') {
 		return TRUE;
 	}
@@ -117,7 +117,7 @@ inline BOOL sfnReservedChar(uint8_t c) {
 	// Reserved if not in range (0X20, 0X7F).
 	return !(0X20 < c && c < 0X7F);
 }
-INLINE BOOL makeSFN(FatLfn_t* fname) {
+BOOL makeSFN(FatLfn_t* fname) {
 	BOOL is83;
 	//  char c;
 	uint8_t c;
