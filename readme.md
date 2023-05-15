@@ -10,14 +10,13 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 - Opening `.ST` disk images
 - Opening `.MSA` disk iamges
 - Opening `.DIM` disk images (Fastcopy & E-Copy)
-- Hard disk image support
+- Hard disk image support (only AHDI 3 standard partitions for now)
+- Creating new floppy disk images (Resizing image until the files fit, or maximum length reached)
 - Extracting files
 - Adding files
-- Creating new folders
-- Deleting files
+- Creating new folders (recursively)
+- Deleting files and folders (recursively)
 - Deleting source files while adding to image (i.e. "move to archive")
-- Deleting folders recursively
-- Creating new floppy disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
 - Progress bar info during operations
 
 ### What's missing (but planned)
@@ -27,6 +26,7 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 - Support PK_PACK_SAVE_PATHS
 - Stand-alone command line version for scripting (adding files, deleting files, creating new disk images, extract deleted files -because tIn insisted-, monitoring directory and if it changes sync the differences with the image)
 - Integrating into other programs (for example PiSCSI, zeST etc)
+- .ini setting to specify if creating a HD disk image is allowed
 
 ## Installation
 
