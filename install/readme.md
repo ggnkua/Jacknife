@@ -7,22 +7,31 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 
 ### What's already there
 
-- Opening `.ST` disk images
-- Opening `.MSA` disk iamges
-- Opening `.DIM` disk images (Fastcopy & E-Copy)
-- Hard disk image support
-- Extracting files
-- Adding files
-- Creating new folders
-- Deleting files
-- Deleting source files while adding to image (i.e. "move to archive")
-- Deleting folders recursively
-- Creating new floppy disk images (Resizing image until the files fit, or maximum length reached. .ini setting to specify if creating a HD disk image is allowed)
-- Progress bar info during operations
+|                                                           |`.ST`  | `.MSA` | `.DIM`<sup>[1](#f1)</sup> | `.AHD`<sup>[2](#f1)</sup> |
+|---                                                        |:---:  |:---:   |:---:                      |:---:                      |
+Opening image (directory listing)                           |&check;|&check; |&check;                    |&check;                    |
+Extracting files<sup>[3](#f3)</sup>                         |&check;|&check; |&check;                    |&check;                    |
+Adding files<sup>[3](#f3)</sup>                             |&check;|&check; |&check;                    |&check;                    |
+Creating new folders<sup>[3](#f3)</sup>                     |&check;|&check; |&check;                    |&check;                    |
+Deleting files<sup>[3](#f3)</sup>                           |&check;|&check; |&cross;                    |&check;                    |
+Deleting folders<sup>[3](#f3)</sup>                         |&check;|&check; |&cross;                    |&check;                    |
+Deleting source files (move to archive)                     |&check;|&check; |&cross;                    |&check;                    |
+Creating new image<sup>[3](#f3)</sup> <sup>[4](#f4)</sup>   |&check;|&check; |&cross;                    |&cross;                    |
+Progress bar info during operations                         |&check;|&check; |&check;                    |&check;                    |
 
-### What's missing (but planned)
+<a name=f1><sup>1</sup></a>Fastcopy & E-Copy
 
+<a name=f2><sup>2</sup></a>Hard disk images, AHDI 3.00 compatible primary partitions only for now
+
+<a name=f3><sup>3</sup></a> Recursively
+
+<a name=f4><sup>4</sup></a> Resizing image until the files fit, or maximum length reached (in which case an error is generated)
+
+### What's missing, but planned (in order of severity/implementation likelihood)
+
+- When adding files, check if file already exists and delete it
 - Extended (XGM) partition support
+- `.ini` file with various settings (specify if creating a HD disk image is allowed, customisable hard disk image extension, etc)
 - Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS
 - Stand-alone command line version for scripting (adding files, deleting files, creating new disk images, extract deleted files -because tIn insisted-, monitoring directory and if it changes sync the differences with the image)

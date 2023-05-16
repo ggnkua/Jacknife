@@ -1865,7 +1865,7 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 	if ((strlen(FileName) > 3 && _strcmpi(FileName + strlen(FileName) - 3, ".st") == 0) || 
 		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".msa") == 0) ||
 		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".dim") == 0) ||
-		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".lol") == 0)) {
+		(strlen(FileName) > 4 && _strcmpi(FileName + strlen(FileName) - 4, ".ahd") == 0)) {
 		tOpenArchiveData oad;
 		oad.ArcName = FileName;
 		tArchive* pa = Open(&oad);
