@@ -38,6 +38,12 @@ Progress bar info during operations                         |&check;|&check; |&c
 
 ## Installation
 
+### Windows
+Pre-built binaries are supplied.
+
+### Linux/OSX
+No binaries for these Operating Systems are provided. Use the `build_linux_mac.sh` script to build the plugin and follow the instructions below for Double Commander.
+
 ### Total Commander
 
 There are _two_ ways of installing this extension depending on your use case:
