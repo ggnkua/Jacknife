@@ -999,6 +999,16 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 				//return DFS_NOTFOUND;
 				return DFS_ISDIRECTORY;
 
+			// ggn: If we opened the file for writing and it exists, delete it
+			//      (TODO: this is optional, perhaps it should be the default, so we match all fopen() implementations)
+			if (mode & DFS_DELETEOPEN && mode & DFS_WRITE)
+			{
+				if (DFS_UnlinkFile(volinfo, path, scratch))
+					return DFS_ERRMISC;
+				// Fallthrough to the new file code below
+				break;
+			}
+
 			return DFS_OK;
 		}
 	}

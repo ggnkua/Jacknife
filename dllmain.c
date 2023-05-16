@@ -1510,6 +1510,8 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 				return E_ECREATE;
 			}
 
+			// TODO: Check if path exists before creating
+
 			// Create the directory entry in the parent directory
 			time_t ltime;
 			time(&ltime);	// Get current date/time
@@ -1602,7 +1604,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 			}
 		}
 		fclose(handle_to_add);
-		ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)current_short_filename, DFS_WRITE, scratch_sector, &fi, file_timestamp);
+		ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)current_short_filename, DFS_WRITE | DFS_DELETEOPEN, scratch_sector, &fi, file_timestamp);
 		if (ret != DFS_OK)
 		{
 			free(read_buf);

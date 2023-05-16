@@ -29,7 +29,6 @@ Progress bar info during operations                         |&check;|&check; |&c
 
 ### What's missing, but planned (in order of severity/implementation likelihood)
 
-- When adding files, check if file already exists and delete it
 - Extended (XGM) partition support
 - `.ini` file with various settings (specify if creating a HD disk image is allowed, customisable hard disk image extension, etc)
 - Writing .DIM images (only opening and extracting is possible at the moment)
@@ -78,10 +77,10 @@ Again, this program requires a manual installation:
 ## Credits
 - FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
 - DOSFS library obtained from http://www.larwe.com/zws/products/dosfs/index.html (appears to be Public Domain licensed), modified and debugged (especially for FAT12)
-- Original plugin code by @tin-nl
-- Extended and replaced FAT library by @ggnkua
-- Linux/Mac fix by @tattlemuss
-- Uses *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / pcg-random.org. Licensed under Apache License 2.0 (NO WARRANTY, etc. see website)
+- Original plugin code by <a href=https://github.com/tin-nl>@tin-nl</a>
+- Extended and replaced FAT library by <a href=https://github.com/ggnkua>@ggnkua</a>
+- Linux/Mac fix by <a href=https://github.com/tattlemuss>@tattlemuss</a>
+- Uses *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / <a href=https://www.pcg-random.org>pcg-random.org</a>. Licensed under Apache License 2.0 (NO WARRANTY, etc. see website)
 - Some code borrowed from [SdFat libary](https://github.com/greiman/SdFat), which carries the following license:
 `MIT License
 
