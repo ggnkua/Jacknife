@@ -1147,6 +1147,10 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 		unsigned int len;
 		len = fi.filelen;
 		unsigned char *buf = (uint8_t *)calloc(1, len + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
+		if (!buf)
+		{
+			return E_NO_MEMORY;
+		}
 		res = DFS_ReadFile(&fi, scratch_sector, buf, &readLen, len);
 		if (res != DFS_OK) {
 			free(buf);
@@ -1194,7 +1198,7 @@ int Close(tArchive* hArcData)
 	pCurrentArchive = NULL;
 	DFS_HostDetach(arch);
 	ENTRYLIST_STORAGE *entry = current_storage;
-	while (entry->prev != NULL) {
+	while (entry && entry->prev != NULL) {
 		ENTRYLIST_STORAGE *temp = entry->prev;
 		free(entry);
 		entry = temp;
@@ -1618,7 +1622,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		{
 			return E_NO_FILES;
 		}
-		read_buf = (unsigned char *)calloc(1, file_size + 1024); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
+		read_buf = (unsigned char *)calloc(1, file_size + 2 * 512); // Allocate some extra RAM and wipe it so we don't write undefined values to the file
 		if (!read_buf)
 		{
 			DFS_HostDetach(&archive_handle);

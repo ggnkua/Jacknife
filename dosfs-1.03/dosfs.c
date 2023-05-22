@@ -181,8 +181,6 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 		  (((uint32_t) lbr->ebpb.ebpb32.root_3) << 24);
 	}
 #else
-	// TODO: all sanity checks are for floppy images,
-	//       these are sure to be different (i.e. bigger) for hard disk partitions
 	// NOTE: a lot of these sanity check values are lifted from FastCopy Pro, so they should be reasonable
 
 	volinfo->secperclus = lbr->bpb.SPC;
