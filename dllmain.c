@@ -379,6 +379,24 @@ BOOL guess_size(int size)
 
 #define BYTE_SWAP_WORD(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
 
+BOOL dim_copy_sector_or_fill_with_blank(int fat_entry, void *s, void *d, int cluster_size, int bytes_left)
+{
+	if (fat_entry == 0 || (fat_entry >= 0xff0 && fat_entry <= 0xff7) || bytes_left <= 0)
+	{
+		return FALSE;
+	}
+	if (bytes_left >= cluster_size)
+	{
+		memcpy(d, s, cluster_size);
+	}
+	else
+	{
+		// Yes, there are .dim files that are truncated at the end
+		memcpy(d, s, bytes_left);
+	}
+	return TRUE;
+}
+
 unsigned char *expand_dim(BOOL fastcopy_header)
 { 
 	unsigned char *buf = (unsigned char *)calloc(1, disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides * 512);
@@ -398,56 +416,34 @@ unsigned char *expand_dim(BOOL fastcopy_header)
 	s += total_filesystem_sectors * 512;
 	d += total_filesystem_sectors * 512;
 
-	unsigned char *fat1 = disk_image.buffer + 512+32 + 3; // A bit hardcoded, but eh
+	unsigned char *fat1 = disk_image.buffer + 512+32 + 3; // TODO: A bit hardcoded, but eh
 	int cluster_size = BYTE_SWAP_WORD(h->cluster_size);
 
-	// TODO: remove duplicate code
 	for (int i = 0; i < BYTE_SWAP_WORD(h->total_clusters) / 2; i++)
 	{
+		BOOL ret;
+
 		// Check "even" entry in a FAT12 record
 		int fat_entry = ((fat1[1] & 0xf) << 8) | fat1[0];
-		if (fat_entry == 0 || (fat_entry >= 0xff0 && fat_entry <= 0xff7) ||bytes_left<=0)
+		ret = dim_copy_sector_or_fill_with_blank(fat_entry, s, d, cluster_size, bytes_left);
+		d += cluster_size;
+		if (ret)
 		{
-			d += cluster_size;
-		}
-		else
-		{
-			if (bytes_left >= cluster_size)
-			{
-				memcpy(d, s, cluster_size);
-			}
-			else
-			{
-				// Yes, there are .dim files that are truncated at the end
-				memcpy(d, s, bytes_left);
-			}
 			s += cluster_size;
-			d += cluster_size;
 			bytes_left -= cluster_size;
 		}
 
 		// Check "odd" entry in a FAT12 record
 		fat_entry = (fat1[2] << 4) | (fat1[1] >> 4);
-		if (fat_entry == 0 || (fat_entry >= 0xff0 && fat_entry <= 0xff7) || bytes_left <= 0)
+		ret = dim_copy_sector_or_fill_with_blank(fat_entry, s, d, cluster_size, bytes_left);
+		d += cluster_size;
+		if (ret)
 		{
-			d += cluster_size;
-		}
-		else
-		{
-			if (bytes_left >= cluster_size)
-			{
-				memcpy(d, s, cluster_size);
-			}
-			else
-			{
-				// Yes, there are .dim files that are truncated at the end
-				memcpy(d, s, bytes_left);
-			}
 			s += cluster_size;
-			d += cluster_size;
 			bytes_left -= cluster_size;
 		}
 
+		// Advance through 2 FAT12 entries
 		fat1 += 3;
 	}
 
