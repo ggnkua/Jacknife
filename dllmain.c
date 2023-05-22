@@ -865,7 +865,7 @@ stEntryList *new_EntryList()
 	return (stEntryList *)&current_storage->data[offset];
 }
 
-uint32_t scan_files(char* path, VOLINFO *vi, int partition)
+uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
 {
 	uint32_t ret;
 	int i;
@@ -877,13 +877,6 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 
 	di.scratch = scratch_sector;
 	stEntryList *lastEntry;
-
-	// TODO: this can be supplied by the caller instead of calculated here (think: recursion)
-	char partition_prefix[16] = { 0 };
-	if (disk_image.mode == DISKMODE_HARD_DISK)
-	{
-		sprintf(partition_prefix, "%i" DIR_SEPARATOR_STRING, partition);
-	}
 
 	ret = DFS_OpenDir(vi, (uint8_t *)path, &di);
 	if (ret == DFS_OK) {
@@ -926,7 +919,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, int partition)
 				lastEntry->next->prev = lastEntry;
 				lastEntry->next->next = NULL;
 				lastEntry = new_item;
-				ret = scan_files(path, vi, partition);
+				ret = scan_files(path, vi, partition_prefix);
 				if (ret != DFS_OK && ret != DFS_EOF)
 				{
 					break;
@@ -1055,7 +1048,17 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 	{
 		current_partition = i;
 		path[0] = 0;
-		ret = scan_files((char *)&path, &arch->vi[i], i);
+
+		// This is a prefix path that is prepended in hard disk partitions.
+		// Otherwise we'd return a list with all directories of all partitions mixed into one.
+		// The current format is "0\", "1\", etc
+		char partition_prefix[16] = { 0 };
+		if (disk_image.mode == DISKMODE_HARD_DISK)
+		{
+			sprintf(partition_prefix, "%i" DIR_SEPARATOR_STRING, i);
+		}
+
+		ret = scan_files((char *)&path, &arch->vi[i], partition_prefix);
 		if (ret != DFS_OK && ret != DFS_EOF) {
 			arch->currentEntry = &entryList;
 			arch->lastEntry = NULL;
