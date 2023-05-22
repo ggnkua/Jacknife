@@ -1281,6 +1281,115 @@ void convert_pathname_to_dos_path(char *src, char *dst)
 
 }
 
+int create_new_disk_image_in_ram(int create_new_disk_image_type, char *PackedFile)
+{
+	// Let's create a disk image and attach it
+	int sides, tracks, sectors;
+	uint8_t *buf;
+
+	if (create_new_disk_image_type == 1)
+	{
+		// 80 tracks, 9 sectors, 2 sides
+		tracks = 80;
+		sides = 2;
+		sectors = 9;
+	}
+	else if (create_new_disk_image_type == 2)
+	{
+		// 82 tracks, 10 sectors, 2 sides
+		tracks = 82;
+		sides = 2;
+		sectors = 10;
+	}
+	else if (create_new_disk_image_type == 3)
+	{
+		// 82 tracks, 11 sectors, 2 sides
+		tracks = 82;
+		sides = 2;
+		sectors = 11;
+	}
+	else
+	{
+		// We tried everything we could for double density disks, give up (for now)
+		// TODO: support high density disks
+		return E_TOO_MANY_FILES;
+	}
+
+	buf = (uint8_t *)calloc(1, tracks * sides * sectors * 512);
+	if (!buf)
+	{
+		return E_NO_MEMORY;
+	}
+
+	// TODO: initialisations are copied from STEem engine's blank images, perhaps we could make this even better?
+	PLBR rs = (PLBR)buf;
+	rs->bra = 0x30eb;
+
+	// Get a random number for the disk serial (check out https://github.com/imneme/pcg-c-basic/blob/master/pcg32-demo.c)
+	pcg32_random_t rng;
+	int rounds = 5;
+	pcg32_srandom_r(&rng, time(NULL) ^ (intptr_t)&printf, (intptr_t)&rounds);
+
+	rs->serial[0] = (uint8_t)(rng.state);
+	rs->serial[1] = (uint8_t)(rng.state >> 8);
+	rs->serial[2] = (uint8_t)(rng.state >> 16);
+
+	rs->bpb.BPS_l = (uint8_t)(512);
+	rs->bpb.BPS_h = (uint8_t)(512 >> 8);
+	rs->bpb.SPC = 2;
+	rs->bpb.RES_l = 1;
+	rs->bpb.RES_h = 0;
+	rs->bpb.NFATS = 2;
+	rs->bpb.NDIRS_l = (uint8_t)(112);
+	rs->bpb.NDIRS_h = (uint8_t)(112 >> 8);
+	rs->bpb.NSECTS_l = (uint8_t)(tracks * sectors * sides);
+	rs->bpb.NSECTS_h = (uint8_t)((tracks * sectors * sides) >> 8);
+	rs->bpb.MEDIA = 0xf9;
+	rs->bpb.SPF_l = 5;
+	rs->bpb.SPF_h = 0;
+	rs->bpb.SPT_l = sectors;
+	rs->bpb.SPT_h = 0;
+	rs->bpb.NSIDES_l = 2;
+	rs->bpb.NSIDES_h = 0;
+	rs->bpb.NHID_l = 0;
+	rs->bpb.NHID_h = 0;
+
+	rs->checksum[0] = 0x97;
+	rs->checksum[1] = 0xc7;
+
+	// Initialise FAT table
+	buf[512 + 0] = 0xf0;
+	buf[512 + 1] = 0xff;
+	buf[512 + 2] = 0xff;
+
+	if (strlen(PackedFile) > 3 && _strcmpi(PackedFile + strlen(PackedFile) - 3, ".st") == 0)
+	{
+		disk_image.mode = DISKMODE_LINEAR;
+	}
+	else if (strlen(PackedFile) > 4 && _strcmpi(PackedFile + strlen(PackedFile) - 4, ".msa") == 0)
+	{
+		disk_image.mode = DISKMODE_MSA;
+	}
+	else if (strlen(PackedFile) > 4 && _strcmpi(PackedFile + strlen(PackedFile) - 4, ".dim") == 0)
+	{
+		disk_image.mode = DISKMODE_FCOPY_CONF_ALL_SECTORS;
+		return E_UNKNOWN_FORMAT; // No .dim write support yet
+	}
+	else
+	{
+		return E_UNKNOWN_FORMAT;
+	}
+
+	disk_image.buffer = buf;
+	disk_image.file_size = tracks * sectors * sides * SECTOR_SIZE;
+	disk_image.disk_geometry_does_not_match_bpb = FALSE;
+	disk_image.image_sectors = sectors;
+	disk_image.image_sides = sides;
+	disk_image.image_tracks = tracks;
+
+	return J_OK;
+}
+
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
 	uint32_t ret;
@@ -1302,119 +1411,26 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	try_new_image_size:
 	if (ret == J_FILE_NOT_FOUND)
 	{
-		// Let's create a disk image and attach it
-		int sides, tracks, sectors;
-		uint8_t *buf;
-
+		// If the image isn't physically available on the disk then we assume that we want
+		// to create a new one. As we don't know sizes, we will try a 82/2/9 image first. If
+		// the files don't fit, we'll keep raising the disk size until we run out of options.
+		// When we run out of space we branch to "try_new_image_size" above and try again.
 		create_new_disk_image_type++;
-		if (create_new_disk_image_type == 1)
+		ret = create_new_disk_image_in_ram(create_new_disk_image_type, PackedFile);
+		if (ret != J_OK)
 		{
-			// 80 tracks, 9 sectors, 2 sides
-			tracks = 80;
-			sides = 2;
-			sectors = 9;
+			return ret;
 		}
-		else if (create_new_disk_image_type == 2)
-		{
-			// 82 tracks, 10 sectors, 2 sides
-			tracks = 82;
-			sides = 2;
-			sectors = 10;
-		}
-		else if (create_new_disk_image_type == 3)
-		{
-			// 82 tracks, 11 sectors, 2 sides
-			tracks = 82;
-			sides = 2;
-			sectors = 11;
-		}
-		else
-		{
-			// We tried everything we could for double density disks, give up (for now)
-			// TODO: support high density disks
-			return E_TOO_MANY_FILES;
-		}
-
-		buf = (uint8_t *)calloc(1, tracks * sides * sectors * 512);
-		if (!buf)
-		{
-			return E_NO_MEMORY;
-		}
-
-		// TODO: initialisations are copied from STEem engine's blank images, perhaps we could make this even better?
-		PLBR rs = (PLBR)buf;
-		rs->bra = 0x30eb;
-
-		// Get a random number for the disk serial (check out https://github.com/imneme/pcg-c-basic/blob/master/pcg32-demo.c)
-		pcg32_random_t rng;
-		int rounds = 5;
-		pcg32_srandom_r(&rng, time(NULL) ^ (intptr_t)&printf, (intptr_t)&rounds);
-
-		rs->serial[0] = (uint8_t)(rng.state);
-		rs->serial[1] = (uint8_t)(rng.state>>8);
-		rs->serial[2] = (uint8_t)(rng.state>>16);
-
-		rs->bpb.BPS_l = (uint8_t)(512);
-		rs->bpb.BPS_h = (uint8_t)(512>>8);
-		rs->bpb.SPC = 2;
-		rs->bpb.RES_l = 1;
-		rs->bpb.RES_h = 0;
-		rs->bpb.NFATS = 2;
-		rs->bpb.NDIRS_l = (uint8_t)(112);
-		rs->bpb.NDIRS_h = (uint8_t)(112>>8);
-		rs->bpb.NSECTS_l = (uint8_t)(tracks*sectors*sides);
-		rs->bpb.NSECTS_h = (uint8_t)((tracks * sectors * sides)>>8);
-		rs->bpb.MEDIA = 0xf9;
-		rs->bpb.SPF_l = 5;
-		rs->bpb.SPF_h = 0;
-		rs->bpb.SPT_l = sectors;
-		rs->bpb.SPT_h = 0;
-		rs->bpb.NSIDES_l = 2;
-		rs->bpb.NSIDES_h = 0;
-		rs->bpb.NHID_l = 0;
-		rs->bpb.NHID_h = 0;
-
-		rs->checksum[0] = 0x97;
-		rs->checksum[1] = 0xc7;
-
-		// Initialise FAT table
-		buf[512+0] = 0xf0;
-		buf[512+1] = 0xff;
-		buf[512+2] = 0xff;
-
-		if (strlen(PackedFile) > 3 && _strcmpi(PackedFile + strlen(PackedFile) - 3, ".st") == 0)
-		{
-			disk_image.mode = DISKMODE_LINEAR;
-		}
-		else if (strlen(PackedFile) > 4 && _strcmpi(PackedFile + strlen(PackedFile) - 4, ".msa") == 0)
-		{
-			disk_image.mode = DISKMODE_MSA;
-		}
-		else if (strlen(PackedFile) > 4 && _strcmpi(PackedFile + strlen(PackedFile) - 4, ".dim") == 0)
-		{
-			disk_image.mode = DISKMODE_FCOPY_CONF_ALL_SECTORS;
-			return E_UNKNOWN_FORMAT; // No .dim write support yet
-		}
-		else
-		{
-			return E_UNKNOWN_FORMAT;
-		}
-
-		disk_image.buffer = buf;
-		disk_image.file_size = tracks * sectors * sides * SECTOR_SIZE;
-		disk_image.disk_geometry_does_not_match_bpb = FALSE;
-		disk_image.image_sectors = sectors;
-		disk_image.image_sides = sides;
-		disk_image.image_tracks = tracks;
 
 		// Now, let DOSFS fill its internal tables
-		if (DFS_GetVolInfo(0, scratch_sector, 0, &archive_handle.vi[0])) {
-			// I mean, we shouldn't get here since the data should be correct,
-			// but let's just leave it here until we're done testing
+		if (DFS_GetVolInfo(0, scratch_sector, 0, &archive_handle.vi[0]))
+		{
+			// TODO: I mean, we shouldn't get here since the data should be correct,
+			//       but let's just leave it here until we're done testing
 			return E_BAD_DATA;
 		}
 
-		ret = J_OK; // Bypass exit condition below
+		ret = J_OK; // Bypass exit condition below (i.e. all's fine, fuggetaboutit!
 	}
 
 	// TODO: This is here for now to disallow people from messing up .DIM images.
