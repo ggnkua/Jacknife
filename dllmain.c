@@ -1390,6 +1390,93 @@ int create_new_disk_image_in_ram(int create_new_disk_image_type, char *PackedFil
 	return J_OK;
 }
 
+uint32_t create_new_folder(char *folder_name, VOLINFO *vi, void *scratch_sector)
+{
+	uint32_t ret;
+	int file_timestamp;
+	unsigned int bytes_written;
+	struct tm *file_tm;
+	FILEINFO fi;
+
+	// Check if path exists before creating
+	ret = DFS_OpenFile(vi, (uint8_t *)folder_name, DFS_READ, scratch_sector, &fi, 0);
+	if (ret == DFS_OK || ret == DFS_ISDIRECTORY)
+	{
+		// Uh-oh, this pathname exists, let's not proceed
+		return E_ECREATE;
+	}
+
+	uint8_t *buf = (uint8_t *)calloc(1, SECTOR_SIZE * 2);
+	if (!buf)
+	{
+		return E_ECREATE;
+	}
+
+	// Create the directory entry in the parent directory
+	time_t ltime;
+	time(&ltime);	// Get current date/time
+	file_tm = localtime(&ltime);
+	file_timestamp = ((file_tm->tm_year - 80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
+
+	if (strlen(folder_name) > MAX_PATH)
+	{
+		// This limit should be modified to fit TOS' filename limits
+		free(buf);
+		return E_ECREATE;
+	}
+
+	// Ask DOSFS to allocate a cluster from the FAT table, and then we'll fill it in below
+	ret = DFS_OpenFile(vi, (uint8_t *)folder_name, DFS_WRITE | DFS_FOLDER, scratch_sector, &fi, file_timestamp);
+	if (ret != DFS_OK)
+	{
+		free(buf);
+		return E_ECREATE;
+	}
+
+	// Now, create the "." and ".." entries in the new folder
+	DIRENT *de = (DIRENT *)buf;
+	memcpy((char *)de->name, ".          ", 11);
+	// This used to be a part of the string above. But OSX thinks that this is 
+	// not good for some reason and crashes? *Shrudder*
+	de->attr = ATTR_DIRECTORY;
+	// TODO: Root folders and sub-folder folders have different rules
+	//       on what cluster number(s) get encoded in their "." and ".." entries
+	//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
+	//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
+	//de->crttime_h = (uint8_t)(file_timestamp >> 8);
+	//de->crttime_l = (uint8_t)file_timestamp;
+	de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
+	de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
+	de->wrttime_h = (uint8_t)(file_timestamp >> 8);
+	de->wrttime_l = (uint8_t)file_timestamp;
+	de->startclus_l_l = fi.cluster & 0xff;
+	de->startclus_l_h = (fi.cluster & 0xff00) >> 8;
+	de->startclus_h_l = (fi.cluster & 0xff0000) >> 16;
+	de->startclus_h_h = (fi.cluster & 0xff000000) >> 24;
+	de++;
+	memcpy((char *)de->name, "..         ", 11);
+	de->attr = ATTR_DIRECTORY;
+	//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
+	//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
+	//de->crttime_h = (uint8_t)(file_timestamp >> 8);
+	//de->crttime_l = (uint8_t)file_timestamp;
+	//de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
+	//de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
+	//de->wrttime_h = (uint8_t)(file_timestamp >> 8);
+	//de->wrttime_l = (uint8_t)file_timestamp;
+	
+	// Write the directory entries
+	ret = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, SECTOR_SIZE * 2);
+
+	// Cleanups
+	free(buf);
+	if (ret != DFS_OK)
+	{
+		return E_ECREATE;
+	}
+	return J_OK;
+}
+
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
 	uint32_t ret;
@@ -1504,69 +1591,15 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 		{
 			// New folder to be created
 			current_short_filename[strlen(current_short_filename) - 1] = 0; // Remove the trailing '\' as to be not confused by a path
-			uint8_t *buf = (uint8_t *)calloc(1, SECTOR_SIZE * 2);
-			if (!buf)
-			{
-				return E_ECREATE;
-			}
-
-			// TODO: Check if path exists before creating
-
-			// Create the directory entry in the parent directory
-			time_t ltime;
-			time(&ltime);	// Get current date/time
-			file_tm = localtime(&ltime);
-			file_timestamp = ((file_tm->tm_year - 80) << 25) | (file_tm->tm_wday << 21) | (file_tm->tm_mday << 16) | (file_tm->tm_hour << 11) | (file_tm->tm_min << 5) | ((file_tm->tm_sec / 2));
-			
 			char *folder_name = current_short_filename;
-			if (strlen(folder_name) > MAX_PATH)
+
+			ret = create_new_folder(folder_name, &archive_handle.vi[partition], scratch_sector);
+			if (ret != J_OK)
 			{
-				// This limit should be modified to fit TOS' filename limits
-				return E_ECREATE;
-			}
-			ret = DFS_OpenFile(&archive_handle.vi[partition], (uint8_t *)folder_name, DFS_WRITE | DFS_FOLDER, scratch_sector, &fi, file_timestamp);
-			if (ret != DFS_OK) {
 				DFS_HostDetach(&archive_handle);
 				return E_ECREATE;
 			}
 
-			// Now, create the "." and ".." entries in the new folder
-			DIRENT *de = (DIRENT *)buf;
-			memcpy((char *)de->name, ".          ", 11);
-			// This used to be a part of the string above. But OSX thinks that this is 
-			// not good for some reason and crashes? *Shrudder*
-			de->attr = ATTR_DIRECTORY;
-			// TODO: Root folders and sub-folder folders have different rules
-			//       on what cluster number(s) get encoded in their "." and ".." entries
-			//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
-			//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
-			//de->crttime_h = (uint8_t)(file_timestamp >> 8);
-			//de->crttime_l = (uint8_t)file_timestamp;
-			de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
-			de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
-			de->wrttime_h = (uint8_t)(file_timestamp >> 8);
-			de->wrttime_l = (uint8_t)file_timestamp;
-			de->startclus_l_l = fi.cluster & 0xff;
-			de->startclus_l_h = (fi.cluster & 0xff00) >> 8;
-			de->startclus_h_l = (fi.cluster & 0xff0000) >> 16;
-			de->startclus_h_h = (fi.cluster & 0xff000000) >> 24;
-			de++;
-			memcpy((char *)de->name, "..         ", 11);
-			de->attr = ATTR_DIRECTORY;
-			//de->crtdate_h = (uint8_t)(file_timestamp >> 24);
-			//de->crtdate_l = (uint8_t)(file_timestamp >> 16);
-			//de->crttime_h = (uint8_t)(file_timestamp >> 8);
-			//de->crttime_l = (uint8_t)file_timestamp;
-			//de->wrtdate_h = (uint8_t)(file_timestamp >> 24);
-			//de->wrtdate_l = (uint8_t)(file_timestamp >> 16);
-			//de->wrttime_h = (uint8_t)(file_timestamp >> 8);
-			//de->wrttime_l = (uint8_t)file_timestamp;
-			ret = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, SECTOR_SIZE*2);
-			free(buf);
-			if (ret != DFS_OK) {
-				DFS_HostDetach(&archive_handle);
-				return E_ECREATE;
-			}
 			// Point to next item in the list (although there probably won't be one)
 			current_file += strlen(current_file) + 1;
 			continue;
