@@ -1152,49 +1152,34 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 			free(buf);
 			return E_EREAD;
 		}
-		// TODO: combine the code into one path?
-		if (DestPath == NULL) {
-			// DestName contains the full path and file nameand DestPath is NULL
-			FILE *f;
-			FOPEN_S(f,DestName, "wb");
-			if (f == NULL) {
-				free(buf);
-				return E_EWRITE;
-			}
-			size_t wlen = fwrite(buf, len, 1, f);
-			if (ProcessDataProc)
-			{
-				abort = !ProcessDataProc(DestName, len);
-			}
-			if (wlen != 1) {
-				free(buf);
-				fclose(f);
-				return E_EWRITE;
-			}
-			fclose(f);
+
+		// Assuming that DestName contains only the file name and DestPath the file path
+		char *filename = DestName;
+		char file[MAX_PATH];
+		if (DestPath != NULL)
+		{
+			// DestName contains the full path and file name and DestPath is NULL
+			sprintf_s(file, MAX_PATH, "%s" DIR_SEPARATOR_STRING "%s", DestPath, DestName);
+			filename = file;
 		}
-		else {
-			// DestName contains only the file name and DestPath the file path
-			char file[MAX_PATH];
-			sprintf_s(file,MAX_PATH, "%s" DIR_SEPARATOR_STRING "%s", DestPath, DestName);
-			FILE *f;
-			FOPEN_S(f,file, "wb");
-			if (f == NULL) {
-				free(buf);
-				return E_EWRITE;
-			}
-			size_t wlen = fwrite(buf, len, 1, f);
-			if (ProcessDataProc)
-			{
-				abort = !ProcessDataProc(file, len);
-			}
-			if (wlen != 1) {
-				free(buf);
-				fclose(f);
-				return E_EWRITE;
-			}
-			fclose(f);
+
+		FILE *f;
+		FOPEN_S(f, filename, "wb");
+		if (f == NULL) {
+			free(buf);
+			return E_EWRITE;
 		}
+		size_t wlen = fwrite(buf, len, 1, f);
+		if (ProcessDataProc)
+		{
+			abort = !ProcessDataProc(DestName, len);
+		}
+		if (wlen != 1 || abort) {
+			free(buf);
+			fclose(f);
+			return E_EWRITE;
+		}
+		fclose(f);
 		free(buf);
 		return 0;
 	}
