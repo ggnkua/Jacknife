@@ -1705,7 +1705,7 @@ uint32_t scan_folder_and_delete(PVOLINFO vi, char *path)
 	uint8_t *scratch_dir = (uint8_t *)malloc(SECTOR_SIZE);
 	if (!scratch_dir) return DFS_ERRMISC;
 	uint8_t *scratch_delete = (uint8_t *)malloc(SECTOR_SIZE);
-	if (!scratch_delete) return DFS_ERRMISC;
+	if (!scratch_delete) { free(scratch_dir); return DFS_ERRMISC; }
 
 	PDIRINFO di = (PDIRINFO)malloc(sizeof(DIRINFO));
 	if (!di) return DFS_ERRMISC;
