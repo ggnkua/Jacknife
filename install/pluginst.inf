@@ -3,4 +3,4 @@ description=Plugin handling Atari ST .MSA (Magic Shadow Archiver) and .ST disk i
 type=wcx
 file=jacknife.wcx
 defaultdir=Jacknife
-defaultextension=msa,st,dim,lol
+defaultextension=msa,st,dim,ahd
