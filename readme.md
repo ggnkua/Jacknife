@@ -33,7 +33,7 @@ Progress bar info during operations                         |&check;|&check; |&c
 - `.ini` file with various settings (specify if creating a HD disk image is allowed, customisable hard disk image extension, etc)
 - Writing .DIM images (only opening and extracting is possible at the moment)
 - Support PK_PACK_SAVE_PATHS
-- Stand-alone command line version for scripting (adding files, deleting files, creating new disk images, extract deleted files -because tIn insisted-, monitoring directory and if it changes sync the differences with the image)
+- (IN PROGRESS - check [SamariTan](#samaritan) below) Stand-alone command line version for scripting (adding files, deleting files, creating new disk images, extract deleted files -because tIn insisted-, monitoring directory and if it changes sync the differences with the image)
 - Integrating into other programs (for example PiSCSI, zeST etc)
 
 ## Installation
@@ -79,6 +79,15 @@ Again, this program requires a manual installation:
 - Navigate to the location where the extracted `jacknife.wcx` or `jacknife.wcx64` exists and select that
 - Click *Install*
 - You can now right click on disk image files on Windows Explorer and select "Open as folder". A new window should open with the disk contents (assuming a valid image)
+
+# SamariTan
+
+This is a no-frills command line version of Jacknife that aims to expose the same functionality, but from the command line. Currently it is in early stages of development and works on Windows only (but this is easy to fix). There is little to no feedback, especially if things fail. It is highly encouraged to not use this tool on files that are not backed up yet. You have been warned.
+
+The current supported set of commands and their syntax is as follows:
+
+- `samaritan c <archive name> <list of files to add>`: This will create an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. Note that the *archive name* must not exist. Also, for the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
+- `samaritan d <archive name> <list of files to delete>`: This will attempt to delete all files in *list of files to delete* from the archive `archive name`.
 
 ## Credits
 - FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
