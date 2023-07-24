@@ -4,3 +4,4 @@ Release
 x64
 *.user
 
+/compileData*
