@@ -38,6 +38,7 @@ typedef char *LPCSTR;
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <errno.h>
 #endif
 
 
@@ -67,6 +68,7 @@ BOOL check_if_pathname_exists(char *pathname)
 #else
     struct stat path_info;
     int test = stat(pathname, &path_info);
+    test = !((test == -1) && (errno == ENOENT));
 #endif
     return (BOOL)test;
 }
