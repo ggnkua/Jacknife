@@ -10,12 +10,39 @@
 #ifdef _MSC_VER
 #define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
+#include <windows.h>
+#include "Shlwapi.h"
 #endif
+
+#ifdef _WIN32
+#define DIR_SEPARATOR_STRING "\\"
+#define FOPEN_S(a,b,c) fopen_s(&a,b,c)
+#else
+#include <unistd.h>
+#define DIR_SEPARATOR_STRING "/"
+#define __stdcall
+#define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
+#define strcpy_s(a,b,c) strcpy(a,c)
+#define FOPEN_S(a,b,c) a=fopen(b,c)
+#define _strcmpi strcasecmp
+typedef char *LPCSTR;
+#define _stat stat
+#define _ftelli64 ftello
+#include <signal.h>
+#define DebugBreak() raise(SIGTRAP);
+#include <ctype.h>
+#define TRUE true
+#define FALSE false
+#define BOOL bool
+#include <stdbool.h>
+#include <stdlib.h>
+#include <sys/stat.h>
+#include <string.h>
+#endif
+
 
 #include <stdlib.h>
 #include <stdio.h>
-#include <windows.h>
-#include "Shlwapi.h"
 #include "wcxhead.h"
 #include "dosfs-1.03/dosfs.h"
 
@@ -77,6 +104,10 @@ int main(int argc, char **argv)
     {
         mode = ST_DELETE;
     }
+    if (*argv[0] == 'a')
+    {
+        mode = ST_ADD;
+    }
 
     char tc_file_listing[4096] = { 0 }; // TODO either make this a resizable array, or make 2 passes scanning filenames (the first to count characters)
     switch (mode)
@@ -88,7 +119,10 @@ int main(int argc, char **argv)
             printf("image exists - TODO: better error message\n");
             return -1;
         }
-
+        // And we fallthrough to the next state
+    }
+    case ST_ADD:
+    {
         // Populate file listing
         int i;
         char *current_file = tc_file_listing;
