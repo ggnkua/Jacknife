@@ -197,7 +197,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	volinfo->numsecs = (lbr->bpb.NSECTS_l) | (lbr->bpb.NSECTS_h << 8);
 	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
-		if (volinfo->numsecs < 1 && volinfo->numsecs>21) // caters for HD floppy drives
+		if (lbr->bpb.SPT_l < 1 || lbr->bpb.SPT_l>21) // caters for HD floppy drives
 			return DFS_ERRMISC;
 	}
 

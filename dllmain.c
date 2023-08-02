@@ -356,8 +356,15 @@ BOOL guess_size(int size)
 		return FALSE;
 	}
 	int tracks, sectors;
+	int start_sectors = 11;
+	// If our image is greater than 1mb, then it's a HD image. Not the best way to detect
+	// HD disks in general, but it should hold
+	if (size > 1024 * 1024)
+	{
+		start_sectors = 21;
+	}
 	for (tracks = 86; tracks > 0; tracks--) {
-		for (sectors = 11; sectors >= 9; sectors--) {
+		for (sectors = start_sectors; sectors >= start_sectors - 3; sectors--) {
 			if (!(size % tracks)) {
 				if ((size % (tracks * sectors * 2 * 512)) == 0) {
 					disk_image.image_tracks = tracks;
