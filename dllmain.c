@@ -891,10 +891,6 @@ uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
 		for (;;) {
 			lastEntry = findLastEntry();
 			ret = DFS_GetNext(vi, &di, &(*lastEntry).de);
-			if (lastEntry->de.name[0] == 'S' && lastEntry->de.name[1] == 'R' && lastEntry->de.name[2] == 'S')
-			{
-				int k = 42;
-			}
 			if (ret != DFS_OK) break;
 			if (lastEntry->de.name[0] == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
@@ -1070,6 +1066,7 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 			arch->currentEntry = &entryList;
 			arch->lastEntry = NULL;
 			wcx_archive->OpenResult = E_BAD_DATA;
+			DFS_HostDetach(arch);
 			return arch;
 		}
 	}
