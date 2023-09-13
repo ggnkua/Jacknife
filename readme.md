@@ -42,8 +42,11 @@ Progress bar info during operations                         |&check;|&check; |&c
 Pre-built binaries are supplied.
 
 ### Linux/OSX
-Starting with v0.05 pre-built binaries are supplied in the releases.
-To build manually, use the `build_linux_mac.sh` script to build the plugin and follow the instructions below for Double Commander.
+Starting with v0.05 pre-built binaries are supplied in the releases. To install, follow the instructions below for Double Commander.
+
+There is a possibility that on OSX a message like "Cannot Be Opened Because the Developer Cannot be Verified". If that happens, the only course of action is to implicitly "trust the developer". Several guides exist on the internet about how to achieve this.
+
+To build manually, use the `build_linux_mac.sh` script to build the plugin. Then see the Double Commander section below on how to install the plugin.
 
 ### Total Commander
 

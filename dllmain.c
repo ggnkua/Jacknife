@@ -1182,10 +1182,14 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 			free(buf);
 			return E_EWRITE;
 		}
-		size_t wlen = fwrite(buf, len, 1, f);
-		if (ProcessDataProc)
+		size_t wlen = 1;
+		if (len)
 		{
-			abort = !ProcessDataProc(DestName, len);
+			size_t wlen = fwrite(buf, len, 1, f);
+			if (ProcessDataProc)
+			{
+				abort = !ProcessDataProc(DestName, len);
+			}
 		}
 		if (wlen != 1 || abort) {
 			free(buf);
