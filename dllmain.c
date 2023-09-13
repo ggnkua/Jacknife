@@ -895,6 +895,12 @@ uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
 			if (lastEntry->de.name[0] == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
 			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0) continue;
+			if (strlen(lastEntry->de.name) > 12)
+			{
+				// Invalid filename, abort
+				ret = DFS_ERRMISC;
+				break;
+			}
 			dir_to_canonical(filename_canonical, lastEntry->de.name);
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {
 				strcpy((char *)vi->label, filename_canonical);
@@ -949,10 +955,6 @@ uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
 				lastEntry = new_item;
 			}
 		}
-	}
-	else
-	{
-		int k = 42;
 	}
 	free(scratch_sector);
 
