@@ -25,6 +25,8 @@ jobs:
 
       - shell: alpine.sh --root {0}
         run: |
+          ls -la
+          cd Jacknife
           ./build_linux_mac.sh
           file jacknife.wcx
           strip jacknife.wcx
@@ -34,5 +36,5 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: jacknife_lin_x64-${{ github.sha }}
-          path: jacknife_lin_x64.wcx
+          path: Jacknife/jacknife_lin_x64.wcx
 
