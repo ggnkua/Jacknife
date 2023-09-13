@@ -25,10 +25,7 @@ jobs:
 
       - shell: alpine.sh --root {0}
         run: |
-          ls -la
           ./build_linux_mac.sh
-          ls -la
-          file jacknife.wcx
           strip jacknife.wcx
           mv jacknife.wcx jacknife_lin_x64.wcx
 
