@@ -42,7 +42,8 @@ Progress bar info during operations                         |&check;|&check; |&c
 Pre-built binaries are supplied.
 
 ### Linux/OSX
-No binaries for these Operating Systems are provided. Use the `build_linux_mac.sh` script to build the plugin and follow the instructions below for Double Commander.
+Starting with v0.05 pre-built binaries are supplied in the releases.
+To build manually, use the `build_linux_mac.sh` script to build the plugin and follow the instructions below for Double Commander.
 
 ### Total Commander
 
