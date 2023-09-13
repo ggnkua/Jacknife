@@ -1070,7 +1070,7 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 			{
 				DFS_HostDetach(arch);
 			}
-			return arch;
+			return NULL;
 		}
 	}
 	arch->currentEntry = &entryList;
