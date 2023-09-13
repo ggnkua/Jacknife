@@ -1,0 +1,33 @@
+# Macos Build
+
+name: jacknife-build-osx
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+  push:
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # This workflow contains a single job called "build"
+  build_osx_11:
+    # The type of runner that the job will run on
+    runs-on: macos-11
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Runs a set of commands using the runners shell
+      - name: Do the work
+        run: |
+          # Apply the secret sauce
+          sed -i -e "s/gcc/gcc -target arm64-apple-macos11/g" build_linux_mac.sh
+          ./build_linux_mac.sh
+          file jacknife.wcx
+          strip jacknife.wcx
+          mv jacknife.wcx jacknife_m1.wcx
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: jacknife_m1-${{ github.sha }}
+          path: jacknife_m1.wcx
