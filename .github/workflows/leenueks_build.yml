@@ -33,5 +33,5 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: jacknife_lin_x64-${{ github.sha }}
-          path: Jacknife/jacknife_lin_x64.wcx
+          path: jacknife_lin_x64.wcx
 
