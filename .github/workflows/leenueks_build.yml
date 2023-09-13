@@ -1,0 +1,38 @@
+name: rmac-build-alpine
+on:
+  workflow_dispatch:
+  push:
+  
+jobs:
+  build_leenueks:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+
+      - uses: actions/checkout@v2
+
+      - name: Setup latest Alpine Linux
+        uses: jirutka/setup-alpine@v1
+        with:
+          packages: >
+            gcc
+            binutils
+            make
+            musl-dev
+            git
+            zip
+
+      - shell: alpine.sh --root {0}
+        run: |
+          ./build_linux_mac.sh
+          file jacknife.wcx
+          strip jacknife.wcx
+          mv jacknife.wcx jacknife_lin_x64.wcx
+
+      - name: "Upload artifacts"
+        uses: actions/upload-artifact@v3
+        with:
+          name: jacknife_lin_x64-${{ github.sha }}
+          path: jacknife_lin_x64.wcx
+
