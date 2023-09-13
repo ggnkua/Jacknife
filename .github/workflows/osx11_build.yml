@@ -26,7 +26,9 @@ jobs:
           sed -i -e "s/gcc/gcc -target arm64-apple-macos11/g" build_linux_mac.sh
           ./build_linux_mac.sh
           file jacknife.wcx
-          strip jacknife.wcx
+          # https://github.com/rust-lang/rust/issues/93988#issuecomment-1042572902
+          # suggests strip -u, so...
+          strip -u jacknife.wcx
           mv jacknife.wcx jacknife_m1.wcx
       - name: "Upload artifacts"
         uses: actions/upload-artifact@v3
