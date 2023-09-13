@@ -1066,7 +1066,10 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 			arch->currentEntry = &entryList;
 			arch->lastEntry = NULL;
 			wcx_archive->OpenResult = E_BAD_DATA;
-			DFS_HostDetach(arch);
+			if (disk_image.mode == DISKMODE_HARD_DISK)
+			{
+				DFS_HostDetach(arch);
+			}
 			return arch;
 		}
 	}
