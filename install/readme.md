@@ -21,7 +21,7 @@ Progress bar info during operations                         |&check;|&check; |&c
 
 <a name=f1><sup>1</sup></a>Fastcopy & E-Copy
 
-<a name=f2><sup>2</sup></a>Hard disk images, AHDI 3.00 compatible primary partitions only for now
+<a name=f2><sup>2</sup></a>Hard disk images, AHDI 3.00 compatible and ICD style primary partitions schemes only for now
 
 <a name=f3><sup>3</sup></a> Recursively
 

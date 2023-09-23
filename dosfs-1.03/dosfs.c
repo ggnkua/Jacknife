@@ -38,9 +38,18 @@ uint32_t DFS_GetPtnStart(uint8_t unit, uint8_t *scratchsector, uint8_t pnum, uin
 {
 	uint32_t result;
 
+#ifdef ATARI_ST_SPECIFIC
+	// ICD style partitions fit extra partition info in the boot sector
+	if (pnum > 9)
+	{
+		// TODO: Check the actual limits of ICD, there could be more. In theory there's space for 4+6=10 partitions
+		return DFS_ERRMISC;
+	}
+#else
 	// DOS ptable supports maximum 4 partitions
 	if (pnum > 3)
 		return DFS_ERRMISC;
+#endif
 
 	// Read MBR from target media
 	if (DFS_ReadSector(unit,scratchsector,0,1)) {
@@ -69,27 +78,37 @@ uint32_t DFS_GetPtnStart(uint8_t unit, uint8_t *scratchsector, uint8_t pnum, uin
 
 	return result;
 #else
-	PAHDIRS rs = (PAHDIRS)scratchsector;
+	PAHDIRS root_sector = (PAHDIRS)scratchsector;
+	AHDI_P_INFO *p_entry = root_sector->ptable;
+	if (pnum > 3)
+	{
+		// ICD seems to have its own scheme for storing more than 4 partitions.
+		// Apparently it reclaims some space from the empty bytes of the bootsector
+		// and stores the info there. These are stored before the standard ptable
+		// so we need some extra logic in this case
+		p_entry = (AHDI_P_INFO * )((unsigned char *)scratchsector + 0x156);
+		pnum -= 4;
+	}
 
-	result = (rs->ptable[pnum].st << 24) |
-		((rs->ptable[pnum].st << 8) & 0xff0000) |
-		((rs->ptable[pnum].st >> 8) & 0xff00) |
-		(rs->ptable[pnum].st >> 24);
+	result = (p_entry[pnum].st << 24) |
+		((p_entry[pnum].st << 8) & 0xff0000) |
+		((p_entry[pnum].st >> 8) & 0xff00) |
+		(p_entry[pnum].st >> 24);
 
 	if (pactive)
-		*pactive = rs->ptable[pnum].flg;
+		*pactive = p_entry[pnum].flg;
 
 	if (pptype)
 	{
-		memcpy(pptype, rs->ptable[pnum].id, 3);	// TODO maybe convert IDs to enum?
+		memcpy(pptype, p_entry[pnum].id, 3);	// TODO maybe convert IDs to enum?
 		pptype[3] = 0;
 	}
 
 	if (psize)
-		*psize = (rs->ptable[pnum].siz << 24) |
-		((rs->ptable[pnum].siz << 8) & 0xff0000) |
-		((rs->ptable[pnum].siz >> 8) & 0xff00) |
-		(rs->ptable[pnum].siz >> 24);
+		*psize = (p_entry[pnum].siz << 24) |
+		((p_entry[pnum].siz << 8) & 0xff0000) |
+		((p_entry[pnum].siz >> 8) & 0xff00) |
+		(p_entry[pnum].siz >> 24);
 
 	return result;
 

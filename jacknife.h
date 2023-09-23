@@ -6,7 +6,7 @@
 #define __stdcall
 #endif
 
-#define MAX_PARTITIONS 4
+#define MAX_PARTITIONS 10
 #define BYTE_SWAP_LONG(a) ((unsigned short)(a>>8)|(unsigned short)(a<<8))
 
 typedef enum
@@ -73,7 +73,7 @@ typedef struct DISK_IMAGE_INFO_
 	int		image_sectors;				// Derived value from image
 	int		image_sides;				// Derived value from image
 	int		image_tracks;				// Derived value from image
-	PART_INFO partition_info[4];
+	PART_INFO partition_info[MAX_PARTITIONS];
 } DISK_IMAGE_INFO;
 
 typedef struct FCOPY_HEADER_

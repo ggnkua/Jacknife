@@ -981,6 +981,8 @@ uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 	// Obtain pointer to first partition on first (only) unit
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
+		disk_image.image_sectors = disk_image.file_size / 512;
+
 		PART_INFO *p = disk_image.partition_info;
 		VOLINFO *a = arch->vi;
 		current_partition = -1; // Skip partition limit checks for this
@@ -988,7 +990,7 @@ uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 		{
 			p->partition_defined = TRUE;
 			p->start_sector = DFS_GetPtnStart(0, scratch_sector, i, &p->active, (uint8_t *)p->type, &p->total_sectors);
-			if (p->start_sector == 0xffffffff)
+			if (p->start_sector == 0xffffffff || p->start_sector > (uint32_t)disk_image.image_sectors || p->total_sectors > (uint32_t)disk_image.image_sectors)
 			{
 				// Do nothing for now, as other partitions might be ok
 				//printf("Cannot find first partition\n");
@@ -1060,6 +1062,7 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 		char partition_prefix[16] = { 0 };
 		if (disk_image.mode == DISKMODE_HARD_DISK)
 		{
+			if (!disk_image.partition_info[i].partition_defined) continue;
 			sprintf(partition_prefix, "%i" DIR_SEPARATOR_STRING, i);
 		}
 
