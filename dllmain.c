@@ -359,7 +359,7 @@ BOOL guess_size(int size)
 	int start_sectors = 11;
 	// If our image is greater than 1mb, then it's a HD image. Not the best way to detect
 	// HD disks in general, but it should hold
-	if (size > 1024 * 1024)
+	if (size > 83 * 11 * 512 * 2)
 	{
 		start_sectors = 21;
 	}
@@ -463,9 +463,19 @@ unsigned char *expand_dim(BOOL fastcopy_header)
 */
 uint32_t DFS_HostAttach(tArchive *arch)
 {
+	disk_image.image_opened_read_only = FALSE;
 	disk_image.file_handle = fopen(arch->archname, "r+b");
 	if (disk_image.file_handle == NULL)
-		return J_FILE_NOT_FOUND;
+	{
+		// Maybe the image is write protected, try to open read only
+		disk_image.file_handle = fopen(arch->archname, "rb");
+		if (disk_image.file_handle == NULL)
+		{
+			return J_FILE_NOT_FOUND;
+		}
+		disk_image.image_opened_read_only = TRUE;
+	}
+		
 
 	fseek(disk_image.file_handle, 0, SEEK_END);
 	disk_image.file_size = _ftelli64(disk_image.file_handle);
@@ -627,6 +637,8 @@ uint32_t DFS_ReadSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_t
 */
 int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 {
+	if (disk_image.image_opened_read_only) return -1;
+
 	if (disk_image.disk_geometry_does_not_match_bpb)
 	{
 		// Wonky disk image detected, let's recalculate the requested sector
@@ -981,7 +993,7 @@ uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 	// Obtain pointer to first partition on first (only) unit
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
-		disk_image.image_sectors = disk_image.file_size / 512;
+		disk_image.image_sectors = (int)disk_image.file_size / 512;
 
 		PART_INFO *p = disk_image.partition_info;
 		VOLINFO *a = arch->vi;

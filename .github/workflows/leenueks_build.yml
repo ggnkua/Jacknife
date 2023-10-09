@@ -1,4 +1,4 @@
-name: rmac-build-alpine
+name: jacknife-build-alpine
 on:
   workflow_dispatch:
   push:

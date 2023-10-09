@@ -73,6 +73,7 @@ typedef struct DISK_IMAGE_INFO_
 	int		image_sectors;				// Derived value from image
 	int		image_sides;				// Derived value from image
 	int		image_tracks;				// Derived value from image
+	BOOL	image_opened_read_only;
 	PART_INFO partition_info[MAX_PARTITIONS];
 } DISK_IMAGE_INFO;
 
