@@ -898,26 +898,19 @@ uint32_t DFS_GetFreeDirEnt(PVOLINFO volinfo, uint8_t *path, PDIRINFO di, PDIRENT
 			di->currententry = 1;	// since the code coming after this expects to subtract 1
 			
 			// Mark newly allocated cluster as end of chain			
+			// ggn: For GEMDOS the end-of-chain marker is fff/ffff/fffffff
 			switch(volinfo->filesystem) {
-				case FAT12:		tempclus = 0xff8;	break;
-				case FAT16:		tempclus = 0xfff8;	break;
-				case FAT32:		tempclus = 0x0ffffff8;	break;
+				case FAT12:		tempclus = 0xfff;	break;
+				case FAT16:		tempclus = 0xffff;	break;
+				case FAT32:		tempclus = 0x0fffffff;	break;
 				default:		return DFS_ERRMISC;
 			}
-			// ggn: If we were asked to create a folder, the end-of-chain marker is fff/ffff/fffffff
-			if (mode & DFS_FOLDER)
-			{
-				tempclus |= 7;
-				// ggn: ?
-				//tempclus = 0;
-				di->currententry = 0;
-			}
+			// ggn: If we reached this far then we should exit instead of looping
+			//      TODO: get rid of the do{} block?
+			//tempclus = 0;
+			di->currententry = 0;
 			DFS_SetFAT(volinfo, di->scratch, &i, di->currentcluster, tempclus);
-			if (mode & DFS_FOLDER)
-			{
-				return DFS_OK;
-			}
-
+			return DFS_OK;
 		}
 	} while (!tempclus);
 
@@ -1111,16 +1104,12 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 			return DFS_ERRMISC;
 
 		// Mark newly allocated cluster as end of chain			
+		// ggn: For GEMDOS the end-of-chain marker is fff/ffff/fffffff
 		switch(volinfo->filesystem) {
-			case FAT12:		cluster = 0xff8;	break;
-			case FAT16:		cluster = 0xfff8;	break;
-			case FAT32:		cluster = 0x0ffffff8;	break;
+			case FAT12:		cluster = 0xfff;	break;
+			case FAT16:		cluster = 0xffff;	break;
+			case FAT32:		cluster = 0x0fffffff;	break;
 			default:		return DFS_ERRMISC;
-		}
-		// ggn: If we were asked to create a folder, the end-of-chain marker is fff/ffff/fffffff
-		if (mode & DFS_FOLDER)
-		{
-			cluster |= 7;
 		}
 		temp = 0;
 		DFS_SetFAT(volinfo, scratch, &temp, fileinfo->cluster, cluster);
@@ -1501,7 +1490,7 @@ uint32_t DFS_WriteFile(PFILEINFO fileinfo, uint8_t *scratch, uint8_t *buffer, ui
 				// Mark newly allocated cluster as end of chain			
 				switch(fileinfo->volinfo->filesystem) {
 					case FAT12:		tempclus = 0xfff;	break; // ggn: Changed this from ff8 for debugging (matching GEMDOS' behaviour)
-					case FAT16:		tempclus = 0xfff8;	break;
+					case FAT16:		tempclus = 0xffff;	break;
 					case FAT32:		tempclus = 0x0ffffff8;	break;
 					default:		return DFS_ERRMISC;
 				}

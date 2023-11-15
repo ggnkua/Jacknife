@@ -655,6 +655,10 @@ int DFS_HostWriteSector(uint8_t *buffer, uint32_t sector, uint32_t count)
 	// It's cached in ram, so let's not hit the disk
 	if (disk_image.mode != DISKMODE_HARD_DISK)
 	{
+		if (sector > disk_image.file_size/512)
+		{
+			return -1;
+		}
 		memcpy(&disk_image.buffer[sector * SECTOR_SIZE], buffer, SECTOR_SIZE);
 		return 0;
 	}
@@ -909,9 +913,8 @@ uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
 			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0) continue;
 			if (strlen(lastEntry->de.name) > 12)
 			{
-				// Invalid filename, abort
-				ret = DFS_ERRMISC;
-				break;
+				// Invalid filename, mark it as illegal
+				strcpy(lastEntry->de.name, "ILLEGAL");
 			}
 			dir_to_canonical(filename_canonical, lastEntry->de.name);
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {

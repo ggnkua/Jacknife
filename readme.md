@@ -29,6 +29,7 @@ Progress bar info during operations                         |&check;|&check; |&c
 
 ### What's missing, but planned (in order of severity/implementation likelihood)
 
+- Writing outside the partitions (i.e. the folder where "0", "1" etc folders exist) causes a crash
 - Extended (XGM) partition support
 - `.ini` file with various settings (specify if creating a HD disk image is allowed, customisable hard disk image extension, etc)
 - Writing .DIM images (only opening and extracting is possible at the moment)
