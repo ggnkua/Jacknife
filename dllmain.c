@@ -1152,7 +1152,14 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	if (Operation == PK_SKIP || Operation == PK_TEST) return 0;
 	tArchive *arch = hArcData;
 	BOOL abort = FALSE;
-
+	
+	// Especially for Double Commander/Mac, skip all actions where DestName
+	// is a folder name (i.e. ends with path separator)
+	if (DestName[strlen(DestName) - 1] == DIR_SEPARATOR)
+	{
+		return 0;
+	}
+	
 	int filename_offset = 0;
 	int partition = 0;
 	if (disk_image.mode == DISKMODE_HARD_DISK)
