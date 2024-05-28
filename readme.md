@@ -21,7 +21,7 @@ Progress bar info during operations                         |&check;|&check; |&c
 
 <a name=f1><sup>1</sup></a>Fastcopy & E-Copy
 
-<a name=f2><sup>2</sup></a>Hard disk images, AHDI 3.00 compatible and ICD style primary partitions schemes only for now
+<a name=f2><sup>2</sup></a>Hard disk images, AHDI 3.00 compatible and ICD style primary partitions schemes only for now. Extended partitions (XGM) not supported yet
 
 <a name=f3><sup>3</sup></a> Recursively
 
@@ -29,8 +29,7 @@ Progress bar info during operations                         |&check;|&check; |&c
 
 ### What's missing, but planned (in order of severity/implementation likelihood)
 
-- Adding a version string somewhere
-- Writing outside the partitions (i.e. the folder where "0", "1" etc folders exist) causes a crash
+- Writing outside the partitions (i.e. the folder where "C", "D" etc folders exist) causes a crash
 - Extended (XGM) partition support
 - `.ini` file with various settings (specify if creating a HD disk image is allowed, customisable hard disk image extension, etc)
 - Writing .DIM images (only opening and extracting is possible at the moment)
