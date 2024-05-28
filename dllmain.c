@@ -1986,6 +1986,7 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 
 void __stdcall ConfigurePacker(HWND Parent, HINSTANCE DllInstance)
 {
+#ifdef _WIN32
 	MessageBox(Parent,
 		"Gives access to Atari ST disk image formats\n"
 		".ST, .MSA. DIM images and .AHD (hard disk sector dumps)\n\n"
@@ -1996,6 +1997,7 @@ void __stdcall ConfigurePacker(HWND Parent, HINSTANCE DllInstance)
 		"Jacknife - Atari ST disk images plugin",
 
 		MB_OK | MB_ICONINFORMATION);
+#endif
 
 	return;
 }
