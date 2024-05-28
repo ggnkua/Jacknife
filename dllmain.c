@@ -1959,7 +1959,7 @@ void __stdcall SetProcessDataProc(myHANDLE hArcData, tProcessDataProc pProcessDa
 }
 
 int __stdcall GetPackerCaps() {
-	return PK_CAPS_SEARCHTEXT | PK_CAPS_BY_CONTENT | PK_CAPS_MODIFY | PK_CAPS_MULTIPLE | PK_CAPS_DELETE | PK_CAPS_NEW;
+	return PK_CAPS_SEARCHTEXT | PK_CAPS_BY_CONTENT | PK_CAPS_MODIFY | PK_CAPS_MULTIPLE | PK_CAPS_DELETE | PK_CAPS_NEW | PK_CAPS_OPTIONS;
 }
 
 BOOL __stdcall CanYouHandleThisFile(char* FileName) {
@@ -1987,7 +1987,7 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 #ifdef _WIN32
 void __stdcall ConfigurePacker(HWND Parent, HINSTANCE DllInstance)
 {
-	MessageBox(Parent,
+	MessageBoxA(Parent,
 		"Gives access to Atari ST disk image formats\n"
 		".ST, .MSA. DIM images and .AHD (hard disk sector dumps)\n\n"
 
@@ -1999,6 +1999,74 @@ void __stdcall ConfigurePacker(HWND Parent, HINSTANCE DllInstance)
 		MB_OK | MB_ICONINFORMATION);
 
 	return;
+}
+#elif defined(__APPLE__)
+// Inspired by https://web.archive.org/web/20201201203547/http://blog.jorgearimany.com/2010/05/messagebox-from-windows-to-mac.html
+//#define IDOK       1
+//#define IDCANCEL   2
+char about_message[] =
+{
+	"Gives access to Atari ST disk image formats\n"
+		".ST, .MSA. DIM images and .AHD (hard disk sector dumps)\n\n"
+
+		"Written by GGN based on code by tIn\n"
+		"https://github.com/ggnkua/Jacknife",
+
+		"Jacknife - Atari ST disk images plugin"
+};
+void __stdcall ConfigurePacker()
+{
+	//convert the strings from char* to CFStringRef
+	CFStringRef header_ref = CFStringCreateWithCString(NULL, "Jacknife - Atari ST disk images plugin", strlen(header));
+	CFStringRef message_ref = CFStringCreateWithCString(NULL, about_message, strlen(about_message));
+
+	CFOptionFlags result;  //result code from the message box
+
+	//launch the message box
+	CFUserNotificationDisplayAlert(
+		0, // no timeout
+		kCFUserNotificationNoteAlertLevel, //change it depending message_type flags ( MB_ICONASTERISK.... etc.)
+		NULL, //icon url, use default, you can change it depending message_type flags
+		NULL, //not used
+		NULL, //localization of strings
+		header_ref, //header text 
+		message_ref, //message text
+		NULL, //default "ok" text in button
+		NULL, //alternate button title
+		NULL, //other button title, null--> no other button
+		&result //response flags
+	);
+
+	//Clean up the strings
+	CFRelease(header_ref);
+	CFRelease(message_ref);
+
+	//Convert the result
+	//if (result == kCFUserNotificationDefaultResponse)
+	//	return IDOK;
+	//else
+	//	return IDCANCEL;
+
+}
+#else
+// Inspired by https://stackoverflow.com/questions/13500069/simplest-way-to-pop-up-error-message-box-on-windows-nix-and-macos/28059220#28059220
+#include <gtk/gtk.h>
+void __stdcall ConfigurePacker()
+{
+	GtkWidget *dialog = gtk_message_dialog_new(NULL,
+		GTK_DIALOG_MODAL,
+		getMessageType(GTK_MESSAGE_INFO),
+		getButtonsType(GTK_BUTTONS_OK),
+		"Gives access to Atari ST disk image formats\n"
+		".ST, .MSA. DIM images and .AHD (hard disk sector dumps)\n\n"
+
+		"Written by GGN based on code by tIn\n"
+		"https://github.com/ggnkua/Jacknife");
+	gtk_window_set_title(GTK_WINDOW(dialog), "Jacknife - Atari ST disk images plugin");
+	gtk_dialog_run(GTK_DIALOG(dialog));
+
+	gtk_widget_destroy(GTK_WIDGET(dialog));
+	while (g_main_context_iteration(NULL, false));
 }
 #endif
 
