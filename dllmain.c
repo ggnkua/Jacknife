@@ -2049,14 +2049,15 @@ void __stdcall ConfigurePacker()
 
 }
 #else
+#ifdef GUI_CODE
 // Inspired by https://stackoverflow.com/questions/13500069/simplest-way-to-pop-up-error-message-box-on-windows-nix-and-macos/28059220#28059220
 #include <gtk/gtk.h>
 void __stdcall ConfigurePacker()
 {
 	GtkWidget *dialog = gtk_message_dialog_new(NULL,
 		GTK_DIALOG_MODAL,
-		getMessageType(GTK_MESSAGE_INFO),
-		getButtonsType(GTK_BUTTONS_OK),
+		GTK_MESSAGE_INFO /*getMessageType(GTK_MESSAGE_INFO)*/,
+		GTK_BUTTONS_OK /*getButtonsType(GTK_BUTTONS_OK)*/,
 		"Gives access to Atari ST disk image formats\n"
 		".ST, .MSA. DIM images and .AHD (hard disk sector dumps)\n\n"
 
@@ -2068,6 +2069,7 @@ void __stdcall ConfigurePacker()
 	gtk_widget_destroy(GTK_WIDGET(dialog));
 	while (g_main_context_iteration(NULL, false));
 }
+#endif
 #endif
 
 #ifdef _WIN32
