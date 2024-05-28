@@ -888,14 +888,14 @@ stEntryList *new_EntryList()
 	return (stEntryList *)&current_storage->data[offset];
 }
 
-uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
+uint32_t scan_files(char *path, VOLINFO *vi, char *partition_prefix)
 {
 	uint32_t ret;
 	int i;
 	DIRINFO di;
 	char filename_canonical[13];
-	
-	uint8_t *scratch_sector=(uint8_t *)malloc(SECTOR_SIZE);
+
+	uint8_t *scratch_sector = (uint8_t *)malloc(SECTOR_SIZE);
 	if (!scratch_sector) return DFS_ERRMISC;
 
 	di.scratch = scratch_sector;
@@ -974,7 +974,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
 	free(scratch_sector);
 
 	return ret;
-
+}
 
 uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 {
@@ -1081,7 +1081,26 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 			sprintf(partition_prefix, "%c" DIR_SEPARATOR_STRING, i + 'C');
 		}
 
+		stEntryList *before_scan_files = findLastEntry();
 		ret = scan_files((char *)&path, &arch->vi[i], partition_prefix);
+
+		stEntryList *after_scan_files = findLastEntry();
+		if (before_scan_files == after_scan_files)
+		{
+			// Empty drive, just add a dummy entry for it so it will show up in the directory listing
+			sprintf_s((char *)after_scan_files->fileWPath, MAX_PATH, "%s" "EMPTY", partition_prefix);
+			stEntryList *new_item = new_EntryList();
+			if (!new_item)
+			{
+				ret = DFS_ERRMISC;
+				break;
+			}
+			after_scan_files->next = new_item;
+			after_scan_files->next->prev = after_scan_files;
+			after_scan_files->next->next = NULL;
+			after_scan_files = new_item;
+		}
+
 		if (ret != DFS_OK && ret != DFS_EOF) {
 			arch->currentEntry = &entryList;
 			arch->lastEntry = NULL;
