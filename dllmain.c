@@ -974,7 +974,7 @@ uint32_t scan_files(char* path, VOLINFO *vi, char *partition_prefix)
 	free(scratch_sector);
 
 	return ret;
-}
+
 
 uint32_t OpenImage(tOpenArchiveData *wcx_archive, tArchive *arch)
 {
@@ -1078,7 +1078,7 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 		if (disk_image.mode == DISKMODE_HARD_DISK)
 		{
 			if (!disk_image.partition_info[i].partition_defined) continue;
-			sprintf(partition_prefix, "%i" DIR_SEPARATOR_STRING, i);
+			sprintf(partition_prefix, "%c" DIR_SEPARATOR_STRING, i + 'C');
 		}
 
 		ret = scan_files((char *)&path, &arch->vi[i], partition_prefix);
@@ -1164,7 +1164,7 @@ int Process(tArchive* hArcData, int Operation, char* DestPath, char* DestName)
 	int partition = 0;
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
-		partition = *arch->lastEntry->fileWPath - '0';
+		partition = *arch->lastEntry->fileWPath - 'C';
 		// Strip out the partition path prefix (for now it's "0\", "1\", etc depending on partition)
 		filename_offset = 2;
 	}
@@ -1578,9 +1578,9 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	if (disk_image.mode == DISKMODE_HARD_DISK)
 	{
 		// Determine which partition we are going to write to.
-		partition = *SubPath - '0';
+		partition = *SubPath - 'C';
 
-		// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
+		// Strip out the partition path prefix (for now it's "C", "D", etc depending on partition)
 		SubPath ++;
 		if (*SubPath == DIR_SEPARATOR)
 		{
@@ -1845,9 +1845,9 @@ int Delete(char *PackedFile, char *DeleteList)
 		if (disk_image.mode == DISKMODE_HARD_DISK)
 		{
 			// Determine which partition we are going to write to.
-			partition = *DeleteList - '0';
+			partition = *DeleteList - 'C';
 
-			// Strip out the partition path prefix (for now it's "0", "1", etc depending on partition)
+			// Strip out the partition path prefix (for now it's "C", "D", etc depending on partition)
 			DeleteList += 2;
 		}
 		current_partition = partition;
