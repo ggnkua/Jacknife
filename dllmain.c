@@ -2016,6 +2016,7 @@ char about_message[] =
 };
 void __stdcall ConfigurePacker()
 {
+#ifdef GUI_CODE
 	//convert the strings from char* to CFStringRef
 	CFStringRef header_ref = CFStringCreateWithCString(NULL, "Jacknife - Atari ST disk images plugin", strlen(header));
 	CFStringRef message_ref = CFStringCreateWithCString(NULL, about_message, strlen(about_message));
@@ -2046,7 +2047,7 @@ void __stdcall ConfigurePacker()
 	//	return IDOK;
 	//else
 	//	return IDCANCEL;
-
+#endif
 }
 #else
 #ifdef GUI_CODE

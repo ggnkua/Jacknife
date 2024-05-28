@@ -49,6 +49,8 @@ There is a possibility that on OSX a message like "Cannot Be Opened Because the 
 
 To build manually, use the `build_linux_mac.sh` script to build the plugin. Then see the Double Commander section below on how to install the plugin.
 
+*Optionally* for Linux, running `build_linux_mac.sh GUI` will attempt to build with the code that displays an "About" dialog enabled. For now this has only been tried with GTK+2.0 (assuming that `libgtk2.0-dev` has been installed on a Debian compatible system) and there are no guarantees that this will work properly across distros. You are on your own. Of course if you manage to get it working on your machine, don't hesitate to get in touch and share your experiences.
+
 ### Total Commander
 
 There are _two_ ways of installing this extension depending on your use case:
