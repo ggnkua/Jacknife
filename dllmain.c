@@ -1078,7 +1078,11 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 		if (disk_image.mode == DISKMODE_HARD_DISK)
 		{
 			if (!disk_image.partition_info[i].partition_defined) continue;
+			// Skip partition if active
+			if (i > 0 && disk_image.partition_info[i].start_sector < disk_image.partition_info[i - 1].start_sector) continue;
+			// Skip partition if its start sector is lower than the previous partition (possibly garbage)
 			sprintf(partition_prefix, "%c" DIR_SEPARATOR_STRING, i + 'C');
+			// TODO add more sanity checks like out of bounds sector
 		}
 
 		stEntryList *before_scan_files = findLastEntry();
