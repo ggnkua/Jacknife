@@ -9,3 +9,4 @@ EXPORTS
 	SetProcessDataProc
 	GetPackerCaps
 	CanYouHandleThisFile
+	ConfigurePacker
