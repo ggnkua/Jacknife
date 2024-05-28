@@ -1,5 +1,8 @@
 //TODO: "If PK_CAPS_HIDE is set, the plugin will not show the file type as a packer. This is useful for plugins which are mainly used for creating files, e.g. to create batch files, avi files etc. The file needs to be opened with Ctrl+PgDn in this case, because Enter will launch the associated application."
 //    ==>altho this would require a second build with different filenames etc - the "gibberish extension"-solution is clumsy, but easier \o/
+
+#define VERSION_NO "0.08"
+
 #define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include <string.h>
@@ -1979,6 +1982,22 @@ BOOL __stdcall CanYouHandleThisFile(char* FileName) {
 		return TRUE;
 	}
 	return FALSE;
+}
+
+void __stdcall ConfigurePacker(HWND Parent, HINSTANCE DllInstance)
+{
+	MessageBox(Parent,
+		"Gives access to Atari ST disk image formats\n"
+		".ST, .MSA. DIM images and .AHD (hard disk sector dumps)\n\n"
+
+		"Written by GGN based on code by tIn\n"
+		"https://github.com/ggnkua/Jacknife",
+
+		"Jacknife - Atari ST disk images plugin",
+
+		MB_OK | MB_ICONINFORMATION);
+
+	return;
 }
 
 #ifdef _WIN32
