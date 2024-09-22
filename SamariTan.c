@@ -48,7 +48,8 @@ typedef char *LPCSTR;
 #include "dosfs-1.03/dosfs.h"
 
 extern int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags);
-int Delete(char *PackedFile, char *DeleteList);
+extern int Delete(char *PackedFile, char *DeleteList);
+extern int install_bootsector(char *image_file, char *bootsector_filename);
 
 typedef enum
 {
@@ -96,7 +97,10 @@ int main(int argc, char **argv)
     // Eat the program filename argument
     argv++;
     argc--;
-
+    
+    int bootsector_install = 0;
+    int filenames_start_index = 2;
+    
     ST_MODES mode = ST_NONE;
     if (*argv[0] == 'c')
     {
@@ -106,9 +110,23 @@ int main(int argc, char **argv)
     {
         mode = ST_DELETE;
     }
-    if (*argv[0] == 'a')
+    else if (*argv[0] == 'a')
     {
         mode = ST_ADD;
+    }
+    else if (*argv[0] == 'b')
+    {
+        if (argc != 2)
+        {
+            printf("exactly 2 arguments for b - TODO: better error message\n");
+            return -1;
+        }
+        bootsector_install = 1;
+    }
+    if (*argv[2] == 'b')
+    {
+        bootsector_install = 1;
+        filenames_start_index = 4;  // Skip parameter 'b' and bootsector filename
     }
 
     char tc_file_listing[4096] = { 0 }; // TODO either make this a resizable array, or make 2 passes scanning filenames (the first to count characters)
@@ -128,12 +146,12 @@ int main(int argc, char **argv)
         // Populate file listing
         int i;
         char *current_file = tc_file_listing;
-        for (i = 2; i < argc; i++)
+        for (i = filenames_start_index; i < argc; i++)
         {
             // TODO: disallow absolute filenames on windows (i.e. strip off "C:")
             if (!check_if_pathname_exists(argv[i]))
             {
-                printf("parameter doesn't exist - TODO: better error message\n");
+                printf("file %s doesn't exist - TODO: better error message\n",argv[i]);
                 return -1;
             }
 
@@ -163,10 +181,11 @@ int main(int argc, char **argv)
             }
         }
         *current_file = 0; // Add a second 0 terminator to indicate end of list
-
-        if (Pack(argv[1], "", "", tc_file_listing, PK_PACK_SAVE_PATHS) != 0)
+        
+        int ret = Pack(argv[1], "", "", tc_file_listing, PK_PACK_SAVE_PATHS);
+        if (ret != 0)
         {
-            printf("Pack fail - TODO: better error message\n");
+            printf("Pack fail %d - TODO: better error message\n",ret);
         }
 
         break;
@@ -176,7 +195,7 @@ int main(int argc, char **argv)
         // Populate file listing
         int i;
         char *current_file = tc_file_listing;
-        for (i = 2; i < argc; i++)
+        for (i = filenames_start_index; i < argc; i++)
         {
             strcat(current_file, argv[i]);
             current_file += strlen(current_file) + 1; // Move past the filename and the 0 terminator
@@ -193,6 +212,11 @@ int main(int argc, char **argv)
         printf("unknown mode - TODO: better error message\n");
         return -1;
     }
-
+    
+    if (bootsector_install)
+    {
+        install_bootsector(argv[1], argv[3]);
+    }
+    
     return 0;
 }

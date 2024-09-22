@@ -28,6 +28,9 @@ typedef enum
 	J_INALID_DIM,
 	J_INVALID_HARD_DISK_IMAGE,
 	J_FAIL,
+	J_BOOTSECTOR_FILE_NOT_FOUND,
+	J_INVALID_BOOTSECTOR_SIZE,
+	J_READ_ERROR,
 } return_codes;
 
 typedef struct stEntryList_

@@ -1545,6 +1545,69 @@ uint32_t create_new_folder(char *folder_name, VOLINFO *vi, void *scratch_sector)
 	return J_OK;
 }
 
+int install_bootsector(char *image_file, char *bootsector_filename)
+{
+	uint32_t ret;
+	tOpenArchiveData wcx_archive = { 0 };
+	tArchive archive_handle = { 0 };
+	strcpy(archive_handle.archname, image_file);
+	
+	ret = OpenImage(&wcx_archive, &archive_handle);
+	if (ret != J_OK)
+	{
+		return ret;
+	}
+	
+	FILE *f = fopen(bootsector_filename, "r+b");
+	if (!f)
+	{
+		return J_BOOTSECTOR_FILE_NOT_FOUND;
+	}
+	
+	fseek(f, 0, SEEK_END);
+	int file_size = ftell(f);
+	fseek(disk_image.file_handle, 0, SEEK_SET);
+	
+	if (file_size <= 2 || file_size > 480)
+	{
+		fclose(f);
+		return J_INVALID_BOOTSECTOR_SIZE;
+	}
+	
+	char bootsector_payload[480] = { 0 };
+	size_t items_read = fread(bootsector_payload, file_size, 1, f);
+	
+	if (!items_read)
+	{
+		fclose(f);
+		return J_READ_ERROR;
+	}
+
+	unsigned char *p = disk_image.buffer;
+	
+	// Mandatory bootsector header (a branch to main code)
+	p[0] = 0x60;
+	p[1] = 0x1c;
+	
+	// Copy bootsector payload
+	memcpy(p+30, bootsector_payload, 480);
+
+	// Calculate checksum and write it at the end of the bootsector
+	unsigned short checksum = 0;
+	unsigned short *checksum_word = (unsigned short *)p;
+	
+	for (int i = 0; i < 255; i++)
+	{
+		checksum += (checksum_word[i]>>8)|(checksum_word[i]<<8);
+	}
+	checksum = 0x1234 - checksum;
+	checksum_word[255] = (checksum>>8)|(checksum<<8);
+	
+	// All done, write changes and close
+	archive_handle.volume_dirty = TRUE;
+	DFS_HostDetach(&archive_handle);
+}
+
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
 	uint32_t ret;
