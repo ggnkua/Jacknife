@@ -14,7 +14,11 @@
 #include "Shlwapi.h"
 #endif
 
-#ifdef _WIN32
+#include <stdlib.h>
+#include <stdio.h>
+#include "wcxhead.h"
+
+#if defined(_WIN32) && !defined(__MINGW32__)
 #define DIR_SEPARATOR_STRING "\\"
 #define FOPEN_S(a,b,c) fopen_s(&a,b,c)
 #else
@@ -41,10 +45,6 @@ typedef char *LPCSTR;
 #include <errno.h>
 #endif
 
-
-#include <stdlib.h>
-#include <stdio.h>
-#include "wcxhead.h"
 #include "dosfs-1.03/dosfs.h"
 
 extern int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags);
@@ -64,7 +64,7 @@ typedef enum
 
 BOOL check_if_pathname_exists(char *pathname)
 {
-#if defined(_WIN32) || defined(_WIN64)
+#if (defined(_WIN32) || defined(_WIN64)) && !defined(__MINGW32__)
     BOOL test = PathFileExistsA(pathname);
 #else
     struct stat path_info;
@@ -76,7 +76,7 @@ BOOL check_if_pathname_exists(char *pathname)
 
 BOOL check_if_directory(char *pathname)
 {
-#if defined(WIN32) || defined(WIN64)
+#if (defined(WIN32) || defined(WIN64)) && !defined(__MINGW32__)
     BOOL test = GetFileAttributesA(pathname) & FILE_ATTRIBUTE_DIRECTORY;
 #else
     struct stat path_info;
