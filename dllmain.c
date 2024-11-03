@@ -1474,7 +1474,9 @@ uint32_t create_new_folder(char *folder_name, VOLINFO *vi, void *scratch_sector)
 		return E_ECREATE;
 	}
 
-	uint8_t *buf = (uint8_t *)calloc(1, SECTOR_SIZE * 2);
+	uint32_t folder_entry_size_in_bytes = SECTOR_SIZE * vi->secperclus;
+
+	uint8_t *buf = (uint8_t *)calloc(1, folder_entry_size_in_bytes);
 	if (!buf)
 	{
 		return E_ECREATE;
@@ -1534,7 +1536,7 @@ uint32_t create_new_folder(char *folder_name, VOLINFO *vi, void *scratch_sector)
 	//de->wrttime_l = (uint8_t)file_timestamp;
 	
 	// Write the directory entries
-	ret = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, SECTOR_SIZE * 2);
+	ret = DFS_WriteFile(&fi, scratch_sector, buf, &bytes_written, folder_entry_size_in_bytes);
 
 	// Cleanups
 	free(buf);
