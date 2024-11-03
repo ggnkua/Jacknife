@@ -1606,6 +1606,8 @@ int install_bootsector(char *image_file, char *bootsector_filename)
 	// All done, write changes and close
 	archive_handle.volume_dirty = TRUE;
 	DFS_HostDetach(&archive_handle);
+	
+	return J_OK;
 }
 
 int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
