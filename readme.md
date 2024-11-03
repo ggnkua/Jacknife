@@ -12,9 +12,9 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 Opening image (directory listing)                           |&check;|&check; |&check;                    |&check;                    |
 Extracting files<sup>[3](#f3)</sup>                         |&check;|&check; |&check;                    |&check;                    |
 Adding files<sup>[3](#f3)</sup>                             |&check;|&check; |&check;                    |&quest;<sup>[3](#f5)</sup> |
-Creating new folders<sup>[3](#f3)</sup>                     |&check;|&check; |&check;                    |&check;                    |
-Deleting files<sup>[3](#f3)</sup>                           |&check;|&check; |&cross;                    |&check;                    |
-Deleting folders<sup>[3](#f3)</sup>                         |&check;|&check; |&cross;                    |&check;                    |
+Creating new folders<sup>[3](#f3)</sup>                     |&check;|&check; |&check;                    |&check;<sup>[3](#f5)</sup> |
+Deleting files<sup>[3](#f3)</sup>                           |&check;|&check; |&cross;                    |&check;<sup>[3](#f5)</sup> |
+Deleting folders<sup>[3](#f3)</sup>                         |&check;|&check; |&cross;                    |&check;<sup>[3](#f5)</sup> |
 Deleting source files (move to archive)                     |&check;|&check; |&cross;                    |&check;                    |
 Creating new image<sup>[3](#f3)</sup> <sup>[4](#f4)</sup>   |&check;|&check; |&cross;                    |&cross;                    |
 Progress bar info during operations                         |&check;|&check; |&check;                    |&check;                    |
