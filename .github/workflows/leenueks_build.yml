@@ -30,7 +30,7 @@ jobs:
           mv jacknife.wcx jacknife_lin_x64.wcx
 
       - name: "Upload artifacts"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jacknife_lin_x64-${{ github.sha }}
           path: jacknife_lin_x64.wcx

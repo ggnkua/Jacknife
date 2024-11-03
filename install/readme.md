@@ -11,25 +11,27 @@ This little plugin enables [Total Commander](https://www.ghisler.com) and compat
 |---                                                        |:---:  |:---:   |:---:                      |:---:                      |
 Opening image (directory listing)                           |&check;|&check; |&check;                    |&check;                    |
 Extracting files<sup>[3](#f3)</sup>                         |&check;|&check; |&check;                    |&check;                    |
-Adding files<sup>[3](#f3)</sup>                             |&check;|&check; |&check;                    |&check;                    |
-Creating new folders<sup>[3](#f3)</sup>                     |&check;|&check; |&check;                    |&check;                    |
-Deleting files<sup>[3](#f3)</sup>                           |&check;|&check; |&cross;                    |&check;                    |
-Deleting folders<sup>[3](#f3)</sup>                         |&check;|&check; |&cross;                    |&check;                    |
+Adding files<sup>[3](#f3)</sup>                             |&check;|&check; |&check;                    |&quest;<sup>[3](#f5)</sup> |
+Creating new folders<sup>[3](#f3)</sup>                     |&check;|&check; |&check;                    |&check;<sup>[3](#f5)</sup> |
+Deleting files<sup>[3](#f3)</sup>                           |&check;|&check; |&cross;                    |&check;<sup>[3](#f5)</sup> |
+Deleting folders<sup>[3](#f3)</sup>                         |&check;|&check; |&cross;                    |&check;<sup>[3](#f5)</sup> |
 Deleting source files (move to archive)                     |&check;|&check; |&cross;                    |&check;                    |
 Creating new image<sup>[3](#f3)</sup> <sup>[4](#f4)</sup>   |&check;|&check; |&cross;                    |&cross;                    |
 Progress bar info during operations                         |&check;|&check; |&check;                    |&check;                    |
 
 <a name=f1><sup>1</sup></a>Fastcopy & E-Copy
 
-<a name=f2><sup>2</sup></a>Hard disk images, AHDI 3.00 compatible and ICD style primary partitions schemes only for now
+<a name=f2><sup>2</sup></a>Hard disk images, AHDI 3.00 compatible and ICD style primary partitions schemes only for now. Extended partitions (XGM) not supported yet
 
 <a name=f3><sup>3</sup></a> Recursively
 
 <a name=f4><sup>4</sup></a> Resizing image until the files fit, or maximum length reached (in which case an error is generated)
 
+<a name=f5><sup>5</sup></a>**Treat with caution, there are still some open bugs with this. Make a backup of the image before trying anything**
+
 ### What's missing, but planned (in order of severity/implementation likelihood)
 
-- Writing outside the partitions (i.e. the folder where "0", "1" etc folders exist) causes a crash
+- Writing outside the partitions (i.e. the folder where "C", "D" etc folders exist) causes a crash
 - Extended (XGM) partition support
 - `.ini` file with various settings (specify if creating a HD disk image is allowed, customisable hard disk image extension, etc)
 - Writing .DIM images (only opening and extracting is possible at the moment)
@@ -48,6 +50,8 @@ Starting with v0.05 pre-built binaries are supplied in the releases. To install,
 There is a possibility that on OSX a message like "Cannot Be Opened Because the Developer Cannot be Verified". If that happens, the only course of action is to implicitly "trust the developer". Several guides exist on the internet about how to achieve this.
 
 To build manually, use the `build_linux_mac.sh` script to build the plugin. Then see the Double Commander section below on how to install the plugin.
+
+*Optionally* for Linux, running `build_linux_mac.sh GUI` will attempt to build with the code that displays an "About" dialog enabled. For now this has only been tried with GTK+2.0 (assuming that `libgtk2.0-dev` has been installed on a Debian compatible system) and there are no guarantees that this will work properly across distros. You are on your own. Of course if you manage to get it working on your machine, don't hesitate to get in touch and share your experiences.
 
 ### Total Commander
 
@@ -91,7 +95,9 @@ This is a no-frills command line version of Jacknife that aims to expose the sam
 
 The current supported set of commands and their syntax is as follows:
 
-- `samaritan c <archive name> <list of files to add>`: This will create an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. Note that the *archive name* must not exist. Also, for the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
+- `samaritan c <archive name> <list of files to add>`: This will create an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. Note that the *archive name* must not exist. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
+- `samaritan a <archive name> <list of files to add>`: This will open an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
+- `samaritan c <archive name> b <bootsector_binary><list of files to add>` / `samaritan a <archive name> <list of files to add>`: Same as the above, but will also install a binary of up to 480 bytes in the boot sector. The binary must contain executable 68000 code and (probably a good idea) PC relative.
 - `samaritan d <archive name> <list of files to delete>`: This will attempt to delete all files in *list of files to delete* from the archive `archive name`.
 
 ## Credits
