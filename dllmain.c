@@ -1,9 +1,12 @@
 //TODO: "If PK_CAPS_HIDE is set, the plugin will not show the file type as a packer. This is useful for plugins which are mainly used for creating files, e.g. to create batch files, avi files etc. The file needs to be opened with Ctrl+PgDn in this case, because Enter will launch the associated application."
 //    ==>altho this would require a second build with different filenames etc - the "gibberish extension"-solution is clumsy, but easier \o/
 
-#define VERSION_NO "0.08"
+#define VERSION_NO "v0.10"
 
+#ifdef _WIN32
 #define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
@@ -44,6 +47,8 @@ typedef char *LPCSTR;
 #endif
 
 #include "wcxhead.h"
+// This define needs to be before including dosfs.h
+#define ATARI_ST_SPECIFIC
 #include "dosfs-1.03/dosfs.h"
 #include "jacknife.h"
 
@@ -2061,7 +2066,7 @@ void __stdcall ConfigurePacker(HWND Parent, HINSTANCE DllInstance)
 		"Written by GGN based on code by tIn\n"
 		"https://github.com/ggnkua/Jacknife",
 
-		"Jacknife - Atari ST disk images plugin",
+		"Jacknife - Atari ST disk images plugin" VERSION_NO,
 
 		MB_OK | MB_ICONINFORMATION);
 
@@ -2079,13 +2084,13 @@ char about_message[] =
 		"Written by GGN based on code by tIn\n"
 		"https://github.com/ggnkua/Jacknife",
 
-		"Jacknife - Atari ST disk images plugin"
+		"Jacknife - Atari ST disk images plugin" VERSION_NO
 };
 void __stdcall ConfigurePacker()
 {
 #ifdef GUI_CODE
 	//convert the strings from char* to CFStringRef
-	CFStringRef header_ref = CFStringCreateWithCString(NULL, "Jacknife - Atari ST disk images plugin", strlen(header));
+	CFStringRef header_ref = CFStringCreateWithCString(NULL, "Jacknife - Atari ST disk images plugin" VERSION_NO, strlen(header));
 	CFStringRef message_ref = CFStringCreateWithCString(NULL, about_message, strlen(about_message));
 
 	CFOptionFlags result;  //result code from the message box

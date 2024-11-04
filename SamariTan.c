@@ -65,7 +65,7 @@ typedef enum
 BOOL check_if_pathname_exists(char *pathname)
 {
 #if (defined(_WIN32) || defined(_WIN64)) && !defined(__MINGW32__)
-    BOOL test = PathFileExistsA(pathname);
+    BOOL test = PathFileExists(pathname);
 #else
     struct stat path_info;
     int test = stat(pathname, &path_info);
