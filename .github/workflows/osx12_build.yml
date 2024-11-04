@@ -17,7 +17,7 @@ jobs:
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       # Runs a set of commands using the runners shell
       - name: Do the work
@@ -37,7 +37,7 @@ jobs:
           strip -u jacknife.wcx
           mv jacknife.wcx jacknife_osx_m1.wcx
       - name: "Upload artifacts"
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: jacknife_osx_${{ github.sha }}
           path: jacknife_osx_*.wcx
