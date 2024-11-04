@@ -1,6 +1,6 @@
 [plugininstall]
-description=Plugin handling Atari ST .MSA (Magic Shadow Archiver) and .ST disk images (this installer opens selected diskimage by CTRL-PageDown only) by tIn/newline. v0.02
+description=Plugin handling Atari ST .MSA (Magic Shadow Archiver) and .ST disk images
 type=wcx
 file=jacknife.wcx
-defaultdir=MSAST
-defaultextension=xyzabcdefgh
+defaultdir=Jacknife
+defaultextension=msa,st,dim,ahd
