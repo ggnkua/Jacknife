@@ -44,6 +44,7 @@ uint32_t DFS_WriteSector(uint8_t unit, uint8_t *buffer, uint32_t sector, uint32_
 #define DFS_WRITE		2			// write-only
 #define DFS_FOLDER		4			// (ggn) create folder
 #define DFS_DELETEOPEN	8			// (ggn) when opening file for write, delete it if it exists			
+#define DFS_CREATE_VOLUME_LABEL 16	// (ggn) Create volume label
 
 //===================================================================
 // Miscellaneous constants

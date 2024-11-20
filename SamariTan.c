@@ -50,6 +50,7 @@ typedef char *LPCSTR;
 extern int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags);
 extern int Delete(char *PackedFile, char *DeleteList);
 extern int install_bootsector(char *image_file, char *bootsector_filename);
+extern int add_volume_label(char *image_file, char *volume_name);
 
 typedef enum
 {
@@ -99,6 +100,9 @@ int main(int argc, char **argv)
     argc--;
     
     int bootsector_install = 0;
+    int volume_label = 0;
+    int volume_label_index = 0;
+    int bootsector_name_index = 0;
     int filenames_start_index = 2;
     
     ST_MODES mode = ST_NONE;
@@ -126,7 +130,18 @@ int main(int argc, char **argv)
     if (*argv[2] == 'b')
     {
         bootsector_install = 1;
-        filenames_start_index = 4;  // Skip parameter 'b' and bootsector filename
+        bootsector_name_index = 3;
+        filenames_start_index += 2;  // Skip parameter 'b' and bootsector filename
+    }
+    if (*argv[2] == 'l' || *argv[4]=='l')
+    {
+        volume_label = 1;
+        volume_label_index = 3;
+        if (*argv[4] == 'l')
+        {
+            volume_label_index = 5;
+        }
+        filenames_start_index += 2;  // Skip parameter 'l' and disk label name
     }
 
     char tc_file_listing[4096] = { 0 }; // TODO either make this a resizable array, or make 2 passes scanning filenames (the first to count characters)
@@ -187,7 +202,9 @@ int main(int argc, char **argv)
         {
             printf("Pack fail %d - TODO: better error message\n",ret);
         }
-
+        
+        ret = add_volume_label(argv[1], argv[volume_label_index]);
+        
         break;
     }
     case ST_DELETE:
@@ -215,7 +232,7 @@ int main(int argc, char **argv)
     
     if (bootsector_install)
     {
-        install_bootsector(argv[1], argv[3]);
+        install_bootsector(argv[1], argv[bootsector_name_index]);
     }
     
     return 0;

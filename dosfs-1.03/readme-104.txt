@@ -13,5 +13,4 @@ v1.04 modifications by George Nakos. Changelist:
 - Can delete files and folders
 - Supports high density disk images (18+ sectors per track)
 - Fixed bug when adding more then 32 files on a folder
-
-
+- Added volume label creation

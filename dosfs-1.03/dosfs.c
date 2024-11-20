@@ -1078,6 +1078,11 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 		{
 			de.attr = ATTR_DIRECTORY;
 		}
+		// ggn: If we were asked to create a volume label, then let's add the volume label attribute
+		if (mode & DFS_CREATE_VOLUME_LABEL)
+		{
+			de.attr = ATTR_VOLUME_ID;
+		}
 
 		// allocate a starting cluster for the directory entry
 		cluster = DFS_GetFreeFAT(volinfo, scratch);
@@ -1115,7 +1120,13 @@ uint32_t DFS_OpenFile(PVOLINFO volinfo, uint8_t *path, uint8_t mode, uint8_t *sc
 		memcpy(&(((PDIRENT)scratch)[di.currententry]), &de, sizeof(DIRENT));
 		if (DFS_WriteSector(volinfo->unit, scratch, fileinfo->dirsector, 1))
 			return DFS_ERRMISC;
-
+		
+		// ggn: if creating a volume label, we don't need to allocate clusters (I think)
+		if (mode & DFS_CREATE_VOLUME_LABEL)
+		{
+			return DFS_OK;
+		}
+		
 		// Mark newly allocated cluster as end of chain			
 		switch(volinfo->filesystem) {
 			case FAT12:		cluster = END_OF_CHAIN_MARKER_FAT12;	break;

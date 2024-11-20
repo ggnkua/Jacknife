@@ -1475,8 +1475,8 @@ uint32_t create_new_folder(char *folder_name, VOLINFO *vi, void *scratch_sector)
 	ret = DFS_OpenFile(vi, (uint8_t *)folder_name, DFS_READ, scratch_sector, &fi, 0);
 	if (ret == DFS_OK || ret == DFS_ISDIRECTORY)
 	{
-		// Uh-oh, this pathname exists, let's not proceed
-		return E_ECREATE;
+		// Uh-oh, this pathname exists, no worries (?)
+		return J_OK;
 	}
 
 	uint32_t folder_entry_size_in_bytes = SECTOR_SIZE * vi->secperclus;
@@ -1609,6 +1609,34 @@ int install_bootsector(char *image_file, char *bootsector_filename)
 	}
 	checksum = 0x1234 - checksum;
 	checksum_word[255] = (checksum>>8)|(checksum<<8);
+	
+	// All done, write changes and close
+	archive_handle.volume_dirty = TRUE;
+	DFS_HostDetach(&archive_handle);
+	
+	return J_OK;
+}
+
+int add_volume_label(char *image_file, char *volume_name)
+{
+	uint32_t ret;
+	tOpenArchiveData wcx_archive = { 0 };
+	tArchive archive_handle = { 0 };
+	strcpy(archive_handle.archname, image_file);
+	
+	ret = OpenImage(&wcx_archive, &archive_handle);
+	if (ret != J_OK)
+	{
+		return ret;
+	}
+	
+	FILEINFO fi;
+	uint8_t scratch_sector[SECTOR_SIZE];
+	ret = DFS_OpenFile(&archive_handle.vi[0], (uint8_t *)volume_name, DFS_WRITE|DFS_CREATE_VOLUME_LABEL, scratch_sector, &fi, 0);
+	if (ret != DFS_OK)
+	{
+		return J_CANNOT_CREATE_FILE;
+	}
 	
 	// All done, write changes and close
 	archive_handle.volume_dirty = TRUE;
