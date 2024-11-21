@@ -99,6 +99,9 @@ The current supported set of commands and their syntax is as follows:
 - `samaritan a <archive name> <list of files to add>`: This will open an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
 - `samaritan c <archive name> b <bootsector_binary><list of files to add>` / `samaritan a <archive name> <list of files to add>`: Same as the above, but will also install a binary of up to 480 bytes in the boot sector. The binary must contain executable 68000 code and (probably a good idea) PC relative.
 - `samaritan d <archive name> <list of files to delete>`: This will attempt to delete all files in *list of files to delete* from the archive `archive name`.
+- `samaritan c b <bootsector file> <list of files to add>`: Like above, but also installs an up to 480 byte bootsector
+- `samaritan c l <volume name> <list of files to add>`: Like above, but also adds a volumen name
+- `samaritan c b <bootsector file> l <volume name> <list of files to add>`: like above, combined
 
 ## Credits
 - FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
