@@ -17,7 +17,6 @@
 
 #include <stdlib.h>
 #include <stdio.h>
-#include "wcxhead.h"
 
 #if defined(_WIN32) && !defined(__MINGW32__)
 #define DIR_SEPARATOR_STRING "\\"
@@ -46,6 +45,7 @@ typedef char *LPCSTR;
 #include <errno.h>
 #endif
 
+#include "wcxhead.h"
 #include "dosfs-1.03/dosfs.h"
 
 extern int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags);
