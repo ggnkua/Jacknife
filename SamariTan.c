@@ -8,6 +8,7 @@
 // - Supply disk geometry for new images, or use the default expending strategy
 
 #ifdef _MSC_VER
+#define VC_EXTRALEAN
 #define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>

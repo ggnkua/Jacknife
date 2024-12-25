@@ -4,6 +4,8 @@
 #define TRUE true
 #include <stdbool.h>
 #else
+#define VC_EXTRALEAN
+#define WIN32_LEAN_AND_MEAN
 #define _CRT_SECURE_NO_WARNINGS
 #include <windows.h>
 #endif
@@ -700,7 +702,11 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 
 			do {
 				result = DFS_GetNext(volinfo, dirinfo, &de);
-			} while (!result && memcmp(de.name, tmpfn, 11));
+				// ggn: If the disk has a volume label which is the same as the name of the folder we're scanning
+				//      against, and that label existed before the folder, then this loop was going to stop at the
+				//      label, so the if immediately below this would mismatch the ATTR_DIRECTORY scan.
+				//      So we added an extra clause to keep looping if we detect ATTR_VOLUME_ID
+			} while (!result && memcmp(de.name, tmpfn, 11) || ((de.attr & ATTR_VOLUME_ID) == ATTR_VOLUME_ID));
 
 			if (!memcmp(de.name, tmpfn, 11) && ((de.attr & ATTR_DIRECTORY) == ATTR_DIRECTORY)) {
 				if (volinfo->filesystem == FAT32) {

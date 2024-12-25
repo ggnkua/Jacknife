@@ -13,7 +13,7 @@ jobs:
   # This workflow contains a single job called "build"
   build_osx_11:
     # The type of runner that the job will run on
-    runs-on: macos-12
+    runs-on: macos-latest
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:

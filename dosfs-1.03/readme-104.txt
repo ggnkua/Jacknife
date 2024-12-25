@@ -14,3 +14,4 @@ v1.04 modifications by George Nakos. Changelist:
 - Supports high density disk images (18+ sectors per track)
 - Fixed bug when adding more then 32 files on a folder
 - Added volume label creation
+- Fixed bug when opening a directory that has the same name as the volume label, and the volume label entry existed before the directory
