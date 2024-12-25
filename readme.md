@@ -106,9 +106,10 @@ The current supported set of commands and their syntax is as follows:
 ## Credits
 - FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
 - DOSFS library obtained from http://www.larwe.com/zws/products/dosfs/index.html (appears to be Public Domain licensed), modified and debugged (especially for FAT12)
-- Original plugin code by <a href=https://github.com/tin-nl>@tin-nl</a>
-- Extended and replaced FAT library by <a href=https://github.com/ggnkua>@ggnkua</a>
-- Linux/Mac fix by <a href=https://github.com/tattlemuss>@tattlemuss</a>
+- Original plugin code by <a href=https://github.com/tin-nl>tin-nl</a>
+- Extended and replaced FAT library by <a href=https://github.com/ggnkua>ggnkua</a>
+- Linux/Mac fix by <a href=https://github.com/tattlemuss>tattlemuss</a>
+- Minimal makefile contributed by <a href=https://github.com/kareandersen>kareandersen</a>
 - Uses *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / <a href=https://www.pcg-random.org>pcg-random.org</a>. Licensed under Apache License 2.0 (NO WARRANTY, etc. see website)
 - Some code borrowed from [SdFat libary](https://github.com/greiman/SdFat), which carries the following license:
 ```MIT License
