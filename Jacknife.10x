@@ -6,23 +6,25 @@
 		<SyncFiles>true</SyncFiles>
 		<Recursive>true</Recursive>
 		<ShowEmptyFolders>true</ShowEmptyFolders>
-		<IsVirtual>false</IsVirtual>
+		<IncludeFilesWithoutExt>false</IncludeFilesWithoutExt>
 		<IsFolder>false</IsFolder>
-		<BuildCommand>c:\msys64\mingw64\bin\gcc -O2 $(WorkspaceDirectory)\dllmain.c $(WorkspaceDirectory)\dosfs-1.03\dosfs.c -shared -fpic -o $(WorkspaceDirectory)\jacknife.wcx</BuildCommand>
-		<RebuildCommand></RebuildCommand>
+		<BuildCommand>c:\msys64\mingw64\bin\gcc $(WorkspaceDirectory)\samaritan.c $(WorkspaceDirectory)\dllmain.c $(WorkspaceDirectory)\dosfs-1.03\dosfs.c -o $(WorkspaceDirectory)\samaritan.exe&#xD;</BuildCommand>
+		<RebuildCommand>c:\msys64\mingw64\bin\gcc -O2 $(WorkspaceDirectory)\dllmain.c $(WorkspaceDirectory)\dosfs-1.03\dosfs.c -shared -fpic -o $(WorkspaceDirectory)\jacknife.wcx</RebuildCommand>
 		<BuildFileCommand></BuildFileCommand>
 		<CleanCommand></CleanCommand>
 		<BuildWorkingDirectory>c:\msys64\mingw64\bin</BuildWorkingDirectory>
 		<CancelBuild></CancelBuild>
-		<RunCommand></RunCommand>
-		<RunCommandWorkingDirectory></RunCommandWorkingDirectory>
+		<Exe></Exe>
+		<Args></Args>
+		<WorkingDirectory></WorkingDirectory>
 		<DebugCommand></DebugCommand>
-		<ExePathCommand></ExePathCommand>
 		<DebugSln></DebugSln>
 		<UseVisualStudioEnvBat>false</UseVisualStudioEnvBat>
+		<CaptureExeOutput>false</CaptureExeOutput>
 		<Configurations>
 			<Configuration>Debug</Configuration>
 			<Configuration>Release</Configuration>
+			<Configuration>SamariTan</Configuration>
 		</Configurations>
 		<Platforms>
 			<Platform>x64</Platform>
@@ -35,8 +37,17 @@
 				<Defines></Defines>
 				<ForceIncludes></ForceIncludes>
 			</ConfigAndPlatform>
+			<ConfigAndPlatform>
+				<Name>SamariTan:x64</Name>
+				<Defines></Defines>
+				<ForceIncludes></ForceIncludes>
+			</ConfigAndPlatform>
 			<Config>
 				<Name>Debug</Name>
+				<Defines></Defines>
+			</Config>
+			<Config>
+				<Name>SamariTan</Name>
 				<Defines></Defines>
 			</Config>
 			<Platform>

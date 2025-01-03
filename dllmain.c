@@ -917,35 +917,34 @@ uint32_t scan_files(char *path, VOLINFO *vi, char *partition_prefix)
 			ret = DFS_GetNext(vi, &di, &(*lastEntry).de);
 			if (ret != DFS_OK) break;
 			if (lastEntry->de.name[0] == 0) continue;
-			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0 || strcmp((char *)lastEntry->de.name, ".") == 0) continue;
-			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0 || strcmp((char *)lastEntry->de.name, "..") == 0) continue;
-			// This is probably not needed since we use strncpy below
-			//if (strlen(lastEntry->de.name) > 12)
-			//{
-			//	// Invalid filename, mark it as illegal
-			//	strcpy(lastEntry->de.name, "ILLEGAL");
-			//}
+			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
+			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0) continue;
+			if (strlen(lastEntry->de.name) > 12)
+			{
+				// Invalid filename, mark it as illegal
+				strcpy(lastEntry->de.name, "ILLEGAL");
+			}
 			dir_to_canonical(filename_canonical, lastEntry->de.name);
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {
-				strncpy((char *)vi->label, filename_canonical, 11);
+				strcpy((char *)vi->label, filename_canonical);
 				continue;
 			}
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
 				//if we exceed MAX_PATH this image has a serious problem, so better bail out
 				if (strlen(path) + strlen(filename_canonical) + 1 >= MAX_PATH ||
 					sprintf_s((char *)lastEntry->fileWPath, MAX_PATH, "%s%s%s" DIR_SEPARATOR_STRING, partition_prefix, path, filename_canonical) == -1) {
-					ret = DFS_ERRMISC;
+					ret = J_PATHNAME_TOO_LARGE;
 					break;
 				}
 				if (i + strlen((char *)lastEntry->de.name) + 1 >= MAX_PATH ||
 					sprintf_s(&path[i], MAX_PATH - i, "%s" DIR_SEPARATOR_STRING, filename_canonical) == -1) {
-					ret = DFS_ERRMISC;
+					ret = J_PATHNAME_TOO_LARGE;
 					break;
 				}
 				stEntryList *new_item = new_EntryList();
 				if (!new_item)
 				{
-					ret = DFS_ERRMISC;
+					ret = J_MEMORY_ALLOCATION_ERROR;
 					break;
 				}
 				lastEntry->next = new_item;
@@ -964,13 +963,13 @@ uint32_t scan_files(char *path, VOLINFO *vi, char *partition_prefix)
 				if (strlen(path) + strlen(filename_canonical) + 1 >= MAX_PATH ||
 					sprintf_s(lastEntry->fileWPath, MAX_PATH, "%s%s%s", partition_prefix, path, filename_canonical) == -1)
 				{
-					ret = DFS_ERRMISC;
+					ret = J_PATHNAME_TOO_LARGE;
 					break;
 				}
 				stEntryList *new_item = new_EntryList();
 				if (!new_item)
 				{
-					ret = DFS_ERRMISC;
+					ret = J_MEMORY_ALLOCATION_ERROR;
 					break;
 				}
 				lastEntry->next = new_item;
@@ -1355,13 +1354,19 @@ void convert_pathname_to_dos_path(char *src, char *dst)
 
 }
 
-int create_new_disk_image_in_ram(int create_new_disk_image_type, char *PackedFile)
+int create_new_disk_image_in_ram(int create_new_disk_image_type, char *PackedFile, NEW_DISK_GEOMETRY *geometry)
 {
 	// Let's create a disk image and attach it
 	int sides, tracks, sectors;
 	uint8_t *buf;
-
-	if (create_new_disk_image_type == 1)
+	
+	if (geometry)
+	{
+		tracks = geometry->tracks;
+		sides = geometry->sides;
+		sectors = geometry->sectors;
+	}
+	else if (create_new_disk_image_type == 1)
 	{
 		// 80 tracks, 9 sectors, 2 sides
 		tracks = 80;
@@ -1646,7 +1651,7 @@ int add_volume_label(char *image_file, char *volume_name)
 	return J_OK;
 }
 
-int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
+int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags, NEW_DISK_GEOMETRY *geometry)
 {
 	uint32_t ret;
 	FILEINFO fi;
@@ -1668,11 +1673,11 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	if (ret == J_FILE_NOT_FOUND)
 	{
 		// If the image isn't physically available on the disk then we assume that we want
-		// to create a new one. As we don't know sizes, we will try a 82/2/9 image first. If
+		// to create a new one. As we don't know sizes, we will try a 80/2/9 image first. If
 		// the files don't fit, we'll keep raising the disk size until we run out of options.
 		// When we run out of space we branch to "try_new_image_size" above and try again.
 		create_new_disk_image_type++;
-		ret = create_new_disk_image_in_ram(create_new_disk_image_type, PackedFile);
+		ret = create_new_disk_image_in_ram(create_new_disk_image_type, PackedFile, geometry);
 		if (ret != J_OK)
 		{
 			return ret;
@@ -2038,7 +2043,7 @@ int __stdcall CloseArchive(myHANDLE hArcData)
 // Add/Move files to image
 int __stdcall PackFiles(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags)
 {
-	return Pack(PackedFile, SubPath, SrcPath, AddList, Flags);
+	return Pack(PackedFile, SubPath, SrcPath, AddList, Flags, NULL);
 }
 
 // Delete files from image

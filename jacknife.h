@@ -21,17 +21,23 @@ typedef enum
 
 typedef enum
 {
-	J_OK,
-	J_FILE_NOT_FOUND,
-	J_MALLOC_ERROR,
-	J_INVALID_MSA,
-	J_INALID_DIM,
-	J_INVALID_HARD_DISK_IMAGE,
-	J_FAIL,
-	J_BOOTSECTOR_FILE_NOT_FOUND,
-	J_INVALID_BOOTSECTOR_SIZE,
-	J_READ_ERROR,
-	J_CANNOT_CREATE_FILE,
+	J_OK                       = 0,	// These items mirror DFS_ codes
+	J_EOF                      = 1, // 
+	J_WRITE_PROTECTED          = 2, // 
+	J_FILE_NOT_FOUND           = 3, // 
+	J_PATHNAME_TOO_LARGE       = 4, // 
+	J_MUST_ALLOCTE_NEW_ITEM    = 5, // 
+	J_ITEM_IS_DIRECTORY        = 6, // 
+	J_MALLOC_ERROR             = 7,
+	J_INVALID_MSA              = 8,
+	J_INALID_DIM               = 9,
+	J_INVALID_HARD_DISK_IMAGE  = 10,
+	J_FAIL                     = 11,
+	J_BOOTSECTOR_FILE_NOT_FOUND= 12,
+	J_INVALID_BOOTSECTOR_SIZE  = 13,
+	J_READ_ERROR               = 14,
+	J_CANNOT_CREATE_FILE       = 15,
+	J_MEMORY_ALLOCATION_ERROR  = 16,
 } return_codes;
 
 typedef struct stEntryList_
@@ -102,5 +108,12 @@ typedef struct FCOPY_HEADER_
 } FCOPY_HEADER;
 
 extern DISK_IMAGE_INFO disk_image;
+
+typedef struct
+{
+	int tracks;
+	int sectors;
+	int sides;
+} NEW_DISK_GEOMETRY;
 
 #endif

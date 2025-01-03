@@ -24,7 +24,9 @@
 #else
 #include <unistd.h>
 #define DIR_SEPARATOR_STRING "/"
+#if !defined(__MINGW32__)
 #define __stdcall
+#endif
 #define sprintf_s(a,b,...) sprintf(a,__VA_ARGS__)
 #define strcpy_s(a,b,c) strcpy(a,c)
 #define FOPEN_S(a,b,c) a=fopen(b,c)
@@ -47,8 +49,9 @@ typedef char *LPCSTR;
 
 #include "wcxhead.h"
 #include "dosfs-1.03/dosfs.h"
+#include "jacknife.h"
 
-extern int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags);
+extern int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flags, NEW_DISK_GEOMETRY *geometry);
 extern int Delete(char *PackedFile, char *DeleteList);
 extern int install_bootsector(char *image_file, char *bootsector_filename);
 extern int add_volume_label(char *image_file, char *volume_name);
@@ -104,47 +107,129 @@ int main(int argc, char **argv)
     int volume_label = 0;
     int volume_label_index = 0;
     int bootsector_name_index = 0;
-    int filenames_start_index = 2;
+    int filenames_start_index = 0;
+    int custom_geometry = 0;
+    NEW_DISK_GEOMETRY geometry =
+    {
+        .tracks = -1,
+        .sectors = -1,
+        .sides = -1
+    };
+    int i = 0;
     
     ST_MODES mode = ST_NONE;
-    if (*argv[0] == 'c')
+    
+    while (i < argc && argv[i][0] == '-')
     {
-        mode = ST_CREATE;
-    }
-    else if (*argv[0] == 'd')
-    {
-        mode = ST_DELETE;
-    }
-    else if (*argv[0] == 'a')
-    {
-        mode = ST_ADD;
-    }
-    else if (*argv[0] == 'b')
-    {
-        if (argc != 2)
+        if (argv[i][1] == 'c')
         {
-            printf("exactly 2 arguments for b - TODO: better error message\n");
-            return -1;
+            mode = ST_CREATE;
+            i++;
         }
-        bootsector_install = 1;
-    }
-    if (*argv[2] == 'b')
-    {
-        bootsector_install = 1;
-        bootsector_name_index = 3;
-        filenames_start_index += 2;  // Skip parameter 'b' and bootsector filename
-    }
-    if (*argv[2] == 'l' || *argv[4]=='l')
-    {
-        volume_label = 1;
-        volume_label_index = 3;
-        if (*argv[4] == 'l')
+        else if (argv[i][1] == 'd')
         {
-            volume_label_index = 5;
+            mode = ST_DELETE;
+            i++;
         }
-        filenames_start_index += 2;  // Skip parameter 'l' and disk label name
+        else if (argv[i][1] == 'a')
+        {
+            mode = ST_ADD;
+            i++;
+        }
+        else if (argv[i][1] == 'b')
+        {
+            if (i + 1 >= argc)
+            {
+                printf("exactly 2 arguments for -b - TODO: better error message\n");
+                return -1;
+            }
+            bootsector_name_index = i + 1;
+            bootsector_install = 1;
+            i++;                        // Skip parameter 'b' and bootsector filename
+        }
+        else if (argv[i][1] == 'l')
+        {
+            if (i + 1 >= argc)
+            {
+                printf("exactly 2 arguments for -l - TODO: better error message\n");
+                return -1;
+            }
+            volume_label = 1;
+            volume_label_index = i + 1;
+            i++;                        // Skip parameter 'l' and disk label name
+        }
+        else if (argv[i][1] == 't')
+        {
+            if (mode != ST_CREATE)
+            {
+                printf("-t requires -c  - TODO: better error message\n");
+                return -1;
+            }
+            if (i + 1 >= argc)
+            {
+                printf("exactly 2 arguments for -t - TODO: better error message\n");
+                return -1;
+            }
+            custom_geometry = 1;
+            geometry.tracks = atoi(argv[i + 1]);
+            i++;
+        }
+        else if (argv[i][1] == 's')
+        {
+            if (mode != ST_CREATE)
+            {
+                printf("-s requires -c  - TODO: better error message\n");
+                return -1;
+            }
+            if (i + 1 >= argc)
+            {
+                printf("exactly 2 arguments for -s - TODO: better error message\n");
+                return -1;
+            }
+            custom_geometry = 1;
+            geometry.sectors = atoi(argv[i + 1]);
+            i++;
+        }
+        else if (argv[i][1] == 'i')
+        {
+            if (mode != ST_CREATE)
+            {
+                printf("-i requires -c  - TODO: better error message\n");
+                return -1;
+            }
+            if (i + 1 >= argc)
+            {
+                printf("exactly 2 arguments for -i - TODO: better error message\n");
+                return -1;
+            }
+            custom_geometry = 1;
+            geometry.sides = atoi(argv[i + 1]);
+            i++;
+        }
+                        
+        i++;
     }
-
+    filenames_start_index = i;    
+    
+    if (custom_geometry && (geometry.sides==-1 || geometry.tracks==-1||geometry.sectors==-1))
+    {
+        printf("Incomplete disk geometry - ");
+        if (geometry.sides == -1)
+        {
+            printf("sides ");
+        }
+        if (geometry.sectors == -1)
+        {
+            printf("sectors ");
+        }
+        if (geometry.tracks == -1)
+        {
+            printf("tracks ");
+        }
+        printf("not specified - TODO: better error message\n");
+        exit(-1);
+    }
+    
     char tc_file_listing[4096] = { 0 }; // TODO either make this a resizable array, or make 2 passes scanning filenames (the first to count characters)
     switch (mode)
     {
@@ -198,7 +283,7 @@ int main(int argc, char **argv)
         }
         *current_file = 0; // Add a second 0 terminator to indicate end of list
         
-        int ret = Pack(argv[1], "", "", tc_file_listing, PK_PACK_SAVE_PATHS);
+        int ret = Pack(argv[1], "", "", tc_file_listing, PK_PACK_SAVE_PATHS, &geometry);
         if (ret != 0)
         {
             printf("Pack fail %d - TODO: better error message\n",ret);
