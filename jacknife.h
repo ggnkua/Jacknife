@@ -38,6 +38,7 @@ typedef enum
 	J_READ_ERROR               = 14,
 	J_CANNOT_CREATE_FILE       = 15,
 	J_MEMORY_ALLOCATION_ERROR  = 16,
+	J_OUT_OF_DISK_SPACE        = 17,
 } return_codes;
 
 typedef struct stEntryList_

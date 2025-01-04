@@ -1740,6 +1740,7 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 	current_file = AddList;
 	while (*current_file) // Each string in AddList is zero-delimited (ends in zero), and the AddList string ends with an extra zero byte, i.e. there are two zero bytes at the end of AddList.
 	{
+		printf("Adding %s\n", current_file);
 		struct tm *file_tm;
 		struct _stat file_stats;
 		int file_timestamp;
@@ -1829,6 +1830,10 @@ int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, int Flag
 				// Try with a disk geometry that gives a bigger size, if available
 				free(disk_image.buffer);
 				ret = J_FILE_NOT_FOUND;
+				if (geometry)
+				{
+					return J_OUT_OF_DISK_SPACE;
+				}
 				goto try_new_image_size;
 			}
 			DFS_HostDetach(&archive_handle);
