@@ -283,7 +283,11 @@ int main(int argc, char **argv)
         }
         *current_file = 0; // Add a second 0 terminator to indicate end of list
         
-        int ret = Pack(argv[1], "", "", tc_file_listing, PK_PACK_SAVE_PATHS, &geometry);
+        NEW_DISK_GEOMETRY *pass_geometry = 0;
+        if (custom_geometry)
+            pass_geometry = &geometry;
+        
+        int ret = Pack(argv[1], "", "", tc_file_listing, PK_PACK_SAVE_PATHS, pass_geometry);
         if (ret != 0)
         {
             printf("Pack fail %d - TODO: better error message\n",ret);
