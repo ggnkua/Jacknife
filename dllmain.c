@@ -414,27 +414,53 @@ BOOL dim_copy_sector_or_fill_with_blank(int fat_entry, void *s, void *d, int clu
 
 unsigned char *expand_dim(BOOL fastcopy_header)
 { 
-	unsigned char *buf = (unsigned char *)calloc(1, disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides * 512);
-	unsigned char *d = buf;
-	if (!d) return 0;
 	unsigned char *s = disk_image.buffer;
+	unsigned short total_clusters;
+	int total_filesystem_sectors;
+	int total_disk_sectors;
+	unsigned short cluster_size;
+	int bytes_left;
 
-	FCOPY_HEADER *h = (FCOPY_HEADER *)s;
-	s += 32;
-
-	int total_filesystem_sectors = BYTE_SWAP_WORD(h->total_filesystem_sectors);
-	int bytes_left = (int)(disk_image.file_size - total_filesystem_sectors * 512);
 	if (fastcopy_header)
+	{
+		FCOPY_HEADER *h = (FCOPY_HEADER *)s;
+		s += 32;
+
+		cluster_size = BYTE_SWAP_WORD(h->cluster_size);
+		total_clusters = BYTE_SWAP_WORD(h->total_clusters);
+		total_filesystem_sectors = BYTE_SWAP_WORD(h->total_filesystem_sectors);
+		total_disk_sectors = disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides;
+		bytes_left = (int)(disk_image.file_size - total_filesystem_sectors * 512); // h->sector_size ????
 		bytes_left -= 32;
+	}
+	else
+	{
+		// TODO sanitise all the following, because it is very likely for things to start exploding
+		// as there's no header for ECopy images. Perhaps it makes sense to call DFS_GetVolInfo
+		// instead of writing the short version of that here
+		PLBR lbr = (PLBR)(s);
+		cluster_size = lbr->bpb.SPC * ((lbr->bpb.BPS_h << 8) + (lbr->bpb.BPS_l));
+		total_disk_sectors = (lbr->bpb.NSECTS_l) | (lbr->bpb.NSECTS_h << 8);
+		total_filesystem_sectors= (lbr->bpb.SPF_h<<8) | (lbr->bpb.SPF_l);
+		total_clusters= total_disk_sectors / lbr->bpb.SPC;
+		bytes_left= (int)(disk_image.file_size - ((lbr->bpb.SPF_h<<8)|(lbr->bpb.SPF_l)) * 512);
+		//bytes_left -= 2;
+		disk_image.image_sectors = (lbr->bpb.SPT_h << 8) | (lbr->bpb.SPT_l);
+		disk_image.image_sides=(lbr->bpb.NSIDES_h<<8)|(lbr->bpb.NSIDES_l);
+		disk_image.image_tracks = total_disk_sectors / disk_image.image_sectors / disk_image.image_sides;
+	}
+
+	unsigned char *buf = (unsigned char *)calloc(1, total_disk_sectors * 512);
+	if (!buf) return 0;
+	unsigned char *d = buf;
 
 	memcpy(d, s, total_filesystem_sectors * 512);
 	s += total_filesystem_sectors * 512;
 	d += total_filesystem_sectors * 512;
 
-	unsigned char *fat1 = disk_image.buffer + 512+32 + 3; // TODO: A bit hardcoded, but eh
-	int cluster_size = BYTE_SWAP_WORD(h->cluster_size);
+	unsigned char *fat1 = disk_image.buffer + 512 + 32 + 3; // TODO: A bit hardcoded, but eh
 
-	for (int i = 0; i < BYTE_SWAP_WORD(h->total_clusters) / 2; i++)
+	for (int i = 0; i < total_clusters / 2; i++)
 	{
 		BOOL ret;
 
@@ -527,14 +553,14 @@ uint32_t DFS_HostAttach(tArchive *arch)
 		}
 		disk_image.buffer = unpacked_msa;
 	}
-	else if (*(unsigned short *)disk_image.buffer == 0x4242)
+	else if (*(unsigned short *)disk_image.buffer == 0x4242)	// "BB"
 	{
 		// Fastcopy DIM image, unpack it to flat buffer if needed
 		FCOPY_HEADER *h = (FCOPY_HEADER *)disk_image.buffer;
 		if (h->start_track)
 		{
 			// Nope, we don't support partial images
-			return J_INALID_DIM;
+			return J_INVALID_DIM;
 		}
 		if (h->disk_configuration_present)
 		{
@@ -549,8 +575,9 @@ uint32_t DFS_HostAttach(tArchive *arch)
 				uint8_t *expanded = expand_dim(TRUE);
 				if (!expanded)
 				{
-					return J_INALID_DIM;
+					return J_INVALID_DIM;
 				}
+				free(disk_image.buffer);
 				disk_image.buffer = expanded;
 			}
 			else
@@ -566,13 +593,24 @@ uint32_t DFS_HostAttach(tArchive *arch)
 			disk_image.buffer += 32;
 		}
 	}
-	else
+	else if (disk_image.buffer[0] == 0xeb && disk_image.buffer[1] == 0x3c && disk_image.buffer[2] == 0x90)
 	{
-		if (!guess_size((int)disk_image.file_size))
+		// Maybe ECopy? Definitely needs unpacking to flat buffer
+		// TODO the header we are testing currently is for MS DOS 5.00 boot sector, so we should get rid of it.
+		// Definitely after add sanitising expand_dim though - feeding random images to it can cause so many crashes.
+		uint8_t *expanded = expand_dim(FALSE);
+		if (!expanded)
 		{
-			free(disk_image.buffer);
-			return -1;
+			return J_INVALID_DIM;
 		}
+		free(disk_image.buffer);
+		disk_image.buffer = expanded;
+	}
+	else if (!guess_size((int)disk_image.file_size))
+	{
+		free(disk_image.buffer);
+		return J_INVALID_DIM;
+
 	}
 	return J_OK;
 }

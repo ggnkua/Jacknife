@@ -30,7 +30,7 @@ typedef enum
 	J_ITEM_IS_DIRECTORY        = 6, // 
 	J_MALLOC_ERROR             = 7,
 	J_INVALID_MSA              = 8,
-	J_INALID_DIM               = 9,
+	J_INVALID_DIM               = 9,
 	J_INVALID_HARD_DISK_IMAGE  = 10,
 	J_FAIL                     = 11,
 	J_BOOTSECTOR_FILE_NOT_FOUND= 12,
