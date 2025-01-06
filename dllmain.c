@@ -917,14 +917,14 @@ uint32_t scan_files(char *path, VOLINFO *vi, char *partition_prefix)
 			ret = DFS_GetNext(vi, &di, &(*lastEntry).de);
 			if (ret != DFS_OK) break;
 			if (lastEntry->de.name[0] == 0) continue;
-			if (strcmp((char *)lastEntry->de.name, ".          \x10") == 0) continue;
-			if (strcmp((char *)lastEntry->de.name, "..         \x10") == 0) continue;
-			if (strlen(lastEntry->de.name) > 12)
-			{
-				// Invalid filename, mark it as illegal
-				strcpy(lastEntry->de.name, "ILLEGAL");
-			}
 			dir_to_canonical(filename_canonical, lastEntry->de.name);
+			if (strcmp(filename_canonical, ".") == 0) continue;
+			if (strcmp(filename_canonical, "..") == 0) continue;
+			//if (strlen(lastEntry->de.name) > 12)
+			//{
+			//	// Invalid filename, mark it as illegal
+			//	strcpy(lastEntry->de.name, "ILLEGAL");
+			//}
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {
 				strcpy((char *)vi->label, filename_canonical);
 				continue;
