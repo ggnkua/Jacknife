@@ -1,11 +1,10 @@
-// "Design" "doc":
-// - adding files
-// - deleting files
-// - creating new disk images
+// "Design" "doc" (i.e. some sort of TODO):
 // - extract deleted files -because tIn insisted-
 // - monitoring directory and if it changes sync the differences with the image
-// - "Make me a 800KB floppy with the following files on"
-// - Supply disk geometry for new images, or use the default expending strategy
+// - As stated multiple times throughout the source, "better error messages"
+// - Rename files
+// - Create folders
+// - Move files
 
 #ifdef _MSC_VER
 #define VC_EXTRALEAN
@@ -107,6 +106,8 @@ char *get_human_readable_error_string(return_codes code)
             return "Memory allocation error";
         case J_OUT_OF_DISK_SPACE:
             return "Out of disk space";
+        default:
+            return "Unknown error";
     }
 }
 

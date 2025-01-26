@@ -95,17 +95,28 @@ This is a no-frills command line version of Jacknife that aims to expose the sam
 
 The current supported set of commands and their syntax is as follows:
 
-- `samaritan c <archive name> <list of files to add>`: This will create an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. Note that the *archive name* must not exist. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
-- `samaritan a <archive name> <list of files to add>`: This will open an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
-- `samaritan c <archive name> b <bootsector_binary><list of files to add>` / `samaritan a <archive name> <list of files to add>`: Same as the above, but will also install a binary of up to 480 bytes in the boot sector. The binary must contain executable 68000 code and (probably a good idea) PC relative.
-- `samaritan d <archive name> <list of files to delete>`: This will attempt to delete all files in *list of files to delete* from the archive `archive name`.
+- `samaritan -c <archive name> <extra parameters> <list of files to add>`: This will create an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. Note that the *archive name* must not exist. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
+- `samaritan -a <archive name> <extra parameters> <list of files to add>`: This will open an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
+- `samaritan -d <archive name> <list of files to delete>`: This will attempt to delete all files in *list of files to delete* from the archive `archive name`.
+- `samaritan -h`: Prints usage information and exits.
+
+`<extra parameters>` are the following:
+
+- `-b <bootsector file>`: Installs an up to 480 bytes bootsector
+- `-l <volume name>`: Adds a volume name
+- `-t <number>`: Specify number of tracks for custom disk geometry
+- `-s <number>`: Specify number of sectors for custom disk geometry
+- `-i <number>`: Specify number of sides for custom disk geometry
+
+(when custom disk geometry is enabled then tracks, sectors and sides must be specified. Also, this only makes sense when creating an image)
 
 ## Credits
 - FAT12/16/32 reader "PetitFAT" used in older versions taken from here: http://www.elm-chan.org/fsw/ff/00index_p.html (slightly modified) 
 - DOSFS library obtained from http://www.larwe.com/zws/products/dosfs/index.html (appears to be Public Domain licensed), modified and debugged (especially for FAT12)
-- Original plugin code by <a href=https://github.com/tin-nl>@tin-nl</a>
-- Extended and replaced FAT library by <a href=https://github.com/ggnkua>@ggnkua</a>
-- Linux/Mac fix by <a href=https://github.com/tattlemuss>@tattlemuss</a>
+- Original plugin code by <a href=https://github.com/tin-nl>tin-nl</a>
+- Extended and replaced FAT library by <a href=https://github.com/ggnkua>ggnkua</a>
+- Linux/Mac fix by <a href=https://github.com/tattlemuss>tattlemuss</a>
+- Minimal makefile contributed by <a href=https://github.com/kareandersen>kareandersen</a>
 - Uses *Really* minimal PCG32 code / (c) 2014 M.E. O'Neill / <a href=https://www.pcg-random.org>pcg-random.org</a>. Licensed under Apache License 2.0 (NO WARRANTY, etc. see website)
 - Some code borrowed from [SdFat libary](https://github.com/greiman/SdFat), which carries the following license:
 ```MIT License
