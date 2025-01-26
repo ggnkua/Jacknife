@@ -942,7 +942,7 @@ uint32_t scan_files(char *path, VOLINFO *vi, char *partition_prefix)
 	char filename_canonical[13];
 
 	uint8_t *scratch_sector = (uint8_t *)malloc(SECTOR_SIZE);
-	if (!scratch_sector) return DFS_ERRMISC;
+	if (!scratch_sector) return J_MALLOC_ERROR;
 
 	di.scratch = scratch_sector;
 	stEntryList *lastEntry;
