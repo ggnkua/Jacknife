@@ -15,3 +15,5 @@ v1.04 modifications by George Nakos. Changelist:
 - Fixed bug when adding more then 32 files on a folder
 - Added volume label creation
 - Fixed bug when opening a directory that has the same name as the volume label, and the volume label entry existed before the directory
+- Improved above bug fix for some cases
+- Forced initialisation of a temporary variable to zero in order for DFS_GetFAT to work more correctly

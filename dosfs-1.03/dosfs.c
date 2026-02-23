@@ -706,7 +706,10 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 				//      against, and that label existed before the folder, then this loop was going to stop at the
 				//      label, so the if immediately below this would mismatch the ATTR_DIRECTORY scan.
 				//      So we added an extra clause to keep looping if we detect ATTR_VOLUME_ID
-			} while (!result && memcmp(de.name, tmpfn, 11) || ((de.attr & ATTR_VOLUME_ID) == ATTR_VOLUME_ID));
+				// tIn: in some rare cases this unfortunatly leads to an endless loop (see e.g. ODDSTUFF.MSA or INDUST33.MSA),
+				//      so let's not loop on /any/ entry that's a volume ID, but just ignore entries that are volume IDs 
+				//      AND match the name we're looking for
+			} while (!result && memcmp(de.name, tmpfn, 11) || ((de.attr & ATTR_VOLUME_ID)== ATTR_VOLUME_ID && memcmp(de.name, tmpfn, 11)==0) );
 
 			if (!memcmp(de.name, tmpfn, 11) && ((de.attr & ATTR_DIRECTORY) == ATTR_DIRECTORY)) {
 				if (volinfo->filesystem == FAT32) {
@@ -758,7 +761,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 */
 uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 {
-	uint32_t tempint;	// required by DFS_GetFAT
+	uint32_t tempint=0;	// required by DFS_GetFAT
 	uint32_t tempcluster;	// ggn: protection against end of directory entries
 
 	// Do we need to read the next sector of the directory?
