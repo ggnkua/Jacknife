@@ -288,6 +288,17 @@ BOOL makeSFN(FatLfn_t* fname) {
 //		return TRUE;
 //}
 
+char *str_toupper(char *str)
+{
+	char *p = str;
+	while (*p != '\0')
+	{
+		*p = toupper(*p);
+		p++;
+	}
+	return str;
+}
+
 //unpack MSA into a newly created buffer
 uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize)
 {
@@ -964,7 +975,8 @@ uint32_t scan_files(char *path, VOLINFO *vi, char *partition_prefix)
 			//	strcpy(lastEntry->de.name, "ILLEGAL");
 			//}
 			if (lastEntry->de.attr & ATTR_VOLUME_ID) {
-				strcpy((char *)vi->label, filename_canonical);
+				memchr(vi->label, ' ', 11);
+				memcpy(vi->label, filename_canonical, sizeof(filename_canonical));
 				continue;
 			}
 			if (lastEntry->de.attr & ATTR_DIRECTORY) {
@@ -2221,6 +2233,62 @@ void __stdcall ConfigurePacker()
 }
 #endif
 #endif
+
+/*
+helper function to atract a whole diskimage, mostly for other DLL users
+*/
+void __stdcall extractFiles(const char *sourceArchiveFileName, const char *targetPath, const char *searchPattern, BOOL deletedOnly)
+{
+	tOpenArchiveData ArchiveData;
+	ArchiveData.ArcName = sourceArchiveFileName;
+	tArchive *diskImage = Open(&ArchiveData);
+	stEntryList *currentEntry = &entryList;
+	char targetPathNormalized[MAX_PATH];
+	strcpy_s(targetPathNormalized, MAX_PATH, targetPath);
+	// remove trailing slash
+	/*
+	if (strlen(targetPathNormalized) > 0 && strlen(targetPathNormalized) < MAX_PATH && (targetPathNormalized[strlen(targetPathNormalized) - 1] == '/' || targetPathNormalized[strlen(targetPathNormalized) - 1] == '\\'))
+	{
+		targetPathNormalized[strlen(targetPathNormalized) - 1] = 0;
+	}
+	*/
+	char searchPatternUcase[MAX_PATH];
+	strcpy_s(searchPatternUcase, MAX_PATH, searchPattern);
+	str_toupper(searchPatternUcase);
+	tHeaderData headerData;
+	printf("%s\n", sourceArchiveFileName);
+	printf("%s\n", targetPathNormalized);
+	while (NextItem(diskImage, &headerData) == 0)
+	{
+		char fileNameUcase[MAX_PATH];
+		strcpy_s(fileNameUcase, MAX_PATH, headerData.FileName);
+		str_toupper(fileNameUcase);
+		char *fileName = headerData.FileName;
+		printf("%s\n", fileName);
+		if (headerData.FileAttr & ATTR_DIRECTORY)
+		{
+			if ((!deletedOnly && headerData.FileName != 0xe5) || (deletedOnly && headerData.FileName == 0xe5))
+			{
+				char newpath[MAX_PATH];
+				sprintf_s(newpath, MAX_PATH, "%s%s", targetPathNormalized, fileName);
+				struct stat tmp = {0};
+				if (stat(newpath, &tmp) == -1)
+				{
+					mkdir(newpath, 0765);
+				}
+			}
+			continue;
+		}
+		// if (!isValidFileName(headerData.FileName) || !wildcardMatch(searchPatternUcase, fileNameUcase))
+		//{
+		//		continue;
+		// }
+		printf("---%s\n", headerData.FileName);
+		int res = Process(diskImage, PK_EXTRACT, targetPath, fileName);
+		printf("-----%d\n", res);
+	}
+	Close(diskImage);
+}
 
 #ifdef _WIN32
 // The DLL entry point

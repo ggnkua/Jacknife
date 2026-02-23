@@ -54,6 +54,8 @@ extern int Pack(char *PackedFile, char *SubPath, char *SrcPath, char *AddList, i
 extern int Delete(char *PackedFile, char *DeleteList);
 extern int install_bootsector(char *image_file, char *bootsector_filename);
 extern int add_volume_label(char *image_file, char *volume_name);
+extern BOOL __stdcall CanYouHandleThisFile(char *FileName);
+extern void __stdcall extractFiles(const char *sourceArchiveFileName, const char *targetPath, const char *searchPattern, BOOL deletedOnly);
 
 typedef enum
 {
@@ -62,6 +64,7 @@ typedef enum
     ST_ADD,
     ST_DELETE,
     ST_EXTRACT,
+    ST_TEST,
     ST_UNDELETE,
     ST_MONITOR
 } ST_MODES;
@@ -139,7 +142,9 @@ void print_usage()
 {
     printf("samaritan -c <archive name> <extra parameters> <list of files to add>: This will create an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. Note that the *archive name* must not exist. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a .. to move up one diretcory will most likely result in an error.\n"
     "samaritan -a <archive name> <extra parameters> <list of files to add>: This will open an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a .. to move up one diretcory will most likely result in an error."
-    "samaritan -d <archive name> <list of files to delete>`: This will attempt to delete all files in <list of files to delete> from the archive <archive name>\n"
+    "samaritan -d <archive name> <list of files to delete>: This will attempt to delete all files in <list of files to delete> from the archive <archive name>\n"
+    "samaritan -v <archive name>: This will test the archive\n"
+    "samaritan -x <archive name> <target path>: This will etract the archive into target path (must exist beforehand)\n"
     "\n"
     "<extra parameters> are the following:\n"
     "\n"
@@ -152,7 +157,7 @@ void print_usage()
 
 int main(int argc, char **argv)
 {
-    if (argc < 4)
+    if (argc < 3)
     {
         print_usage();
         return -1;
@@ -180,7 +185,32 @@ int main(int argc, char **argv)
 
     while (i < argc && argv[i][0] == '-')
     {
-        if (argv[i][1] == 'c')
+        if (argv[i][1] == 'v')
+        {
+            mode = ST_TEST;
+            if (i + 1 >= argc)
+            {
+                printf("No filename supplied for -v\n");
+                return -1;
+            }
+            i++;
+        }
+        else if (argv[i][1] == 'x')
+        {
+            mode = ST_EXTRACT;
+            if (i + 1 >= argc)
+            {
+                printf("No filename supplied for -x\n");
+                return -1;
+            }
+            if (i + 2 >= argc)
+            {
+                printf("No target path supplied for -x\n");
+                return -1;
+            }
+            i++;
+        }
+        else if (argv[i][1] == 'c')
         {
             mode = ST_CREATE;
             i++;
@@ -274,7 +304,6 @@ int main(int argc, char **argv)
         i++;
     }
     filenames_start_index = i;
-
     if (custom_geometry && (geometry.sides==-1 || geometry.tracks==-1||geometry.sectors==-1))
     {
         printf("Incomplete disk geometry - ");
@@ -297,6 +326,19 @@ int main(int argc, char **argv)
     char tc_file_listing[4096] = { 0 }; // TODO either make this a resizable array, or make 2 passes scanning filenames (the first to count characters)
     switch (mode)
     {
+    case ST_EXTRACT:
+        extractFiles(argv[1], argv[2], "*", FALSE);
+        return 0;
+        break;
+    case ST_TEST:
+        if (CanYouHandleThisFile(argv[1]))
+        {
+            printf("OK\n");
+            return 0;
+        }
+        printf("Can't open the image file, probably corrupted file system.\n");
+        return -1;
+        break;
     case ST_CREATE:
     {
         if (check_if_pathname_exists(argv[1]))
