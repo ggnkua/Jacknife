@@ -2240,7 +2240,7 @@ helper function to atract a whole diskimage, mostly for other DLL users
 void __stdcall extractFiles(const char *sourceArchiveFileName, const char *targetPath, const char *searchPattern, BOOL deletedOnly)
 {
 	tOpenArchiveData ArchiveData;
-	ArchiveData.ArcName = sourceArchiveFileName;
+	ArchiveData.ArcName = (char *)sourceArchiveFileName;
 	tArchive *diskImage = Open(&ArchiveData);
 	stEntryList *currentEntry = &entryList;
 	char targetPathNormalized[MAX_PATH];
@@ -2267,9 +2267,9 @@ void __stdcall extractFiles(const char *sourceArchiveFileName, const char *targe
 		printf("%s\n", fileName);
 		if (headerData.FileAttr & ATTR_DIRECTORY)
 		{
-			if ((!deletedOnly && headerData.FileName != 0xe5) || (deletedOnly && headerData.FileName == 0xe5))
+			if ((!deletedOnly && headerData.FileName[0] != 0xe5) || (deletedOnly && headerData.FileName[0] == 0xe5))
 			{
-				char newpath[MAX_PATH];
+				char newpath[MAX_PATH*2];
 				sprintf_s(newpath, MAX_PATH, "%s%s", targetPathNormalized, fileName);
 				struct stat tmp = {0};
 				if (stat(newpath, &tmp) == -1)
@@ -2284,7 +2284,7 @@ void __stdcall extractFiles(const char *sourceArchiveFileName, const char *targe
 		//		continue;
 		// }
 		printf("---%s\n", headerData.FileName);
-		int res = Process(diskImage, PK_EXTRACT, targetPath, fileName);
+		int res = Process(diskImage, PK_EXTRACT, (char *)targetPath, fileName);
 		printf("-----%d\n", res);
 	}
 	Close(diskImage);
