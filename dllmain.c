@@ -604,7 +604,9 @@ uint32_t DFS_HostAttach(tArchive *arch)
 			disk_image.buffer += 32;
 		}
 	}
-	else if (disk_image.buffer[0] == 0xeb && disk_image.buffer[1] == 0x3c && disk_image.buffer[2] == 0x90)
+	else if ((disk_image.buffer[0] == 0xeb && disk_image.buffer[1] == 0x3c && disk_image.buffer[2] == 0x90)
+		|| (disk_image.buffer[0] == 0xeb && disk_image.buffer[1] == 0x34 && disk_image.buffer[2] == 0x90)
+		|| (disk_image.buffer[0] == 0xe9 && disk_image.buffer[1] == 0x00 && disk_image.buffer[2] == 0x4e))
 	{
 		// Maybe ECopy? Definitely needs unpacking to flat buffer
 		// TODO the header we are testing currently is for MS DOS 5.00 boot sector, so we should get rid of it.
