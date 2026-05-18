@@ -430,7 +430,9 @@ unsigned char *expand_dim(BOOL fastcopy_header)
 	int total_filesystem_sectors;
 	int total_disk_sectors;
 	unsigned short cluster_size;
+	int reserved_sectors;
 	int bytes_left;
+	unsigned char *fat1;
 
 	if (fastcopy_header)
 	{
@@ -443,6 +445,7 @@ unsigned char *expand_dim(BOOL fastcopy_header)
 		total_disk_sectors = disk_image.image_tracks * disk_image.image_sectors * disk_image.image_sides;
 		bytes_left = (int)(disk_image.file_size - total_filesystem_sectors * 512); // h->sector_size ????
 		bytes_left -= 32;
+		fat1 = disk_image.buffer + 512 + 32 + 3; // TODO: A bit hardcoded, but eh
 	}
 	else
 	{
@@ -455,10 +458,13 @@ unsigned char *expand_dim(BOOL fastcopy_header)
 		total_filesystem_sectors= (lbr->bpb.SPF_h<<8) | (lbr->bpb.SPF_l);
 		total_clusters= total_disk_sectors / lbr->bpb.SPC;
 		bytes_left= (int)(disk_image.file_size - ((lbr->bpb.SPF_h<<8)|(lbr->bpb.SPF_l)) * 512);
+		reserved_sectors = (lbr->bpb.RES_l);
 		//bytes_left -= 2;
 		disk_image.image_sectors = (lbr->bpb.SPT_h << 8) | (lbr->bpb.SPT_l);
 		disk_image.image_sides=(lbr->bpb.NSIDES_h<<8)|(lbr->bpb.NSIDES_l);
 		disk_image.image_tracks = total_disk_sectors / disk_image.image_sectors / disk_image.image_sides;
+
+		fat1 = disk_image.buffer + 512 * reserved_sectors;
 	}
 
 	unsigned char *buf = (unsigned char *)calloc(1, total_disk_sectors * 512);
@@ -468,8 +474,6 @@ unsigned char *expand_dim(BOOL fastcopy_header)
 	memcpy(d, s, total_filesystem_sectors * 512);
 	s += total_filesystem_sectors * 512;
 	d += total_filesystem_sectors * 512;
-
-	unsigned char *fat1 = disk_image.buffer + 512 + 32 + 3; // TODO: A bit hardcoded, but eh
 
 	for (int i = 0; i < total_clusters / 2; i++)
 	{
@@ -608,22 +612,25 @@ uint32_t DFS_HostAttach(tArchive *arch)
 		|| (disk_image.buffer[0] == 0xeb && disk_image.buffer[1] == 0x34 && disk_image.buffer[2] == 0x90)
 		|| (disk_image.buffer[0] == 0xe9 && disk_image.buffer[1] == 0x00 && disk_image.buffer[2] == 0x4e))
 	{
-		// Maybe ECopy? Definitely needs unpacking to flat buffer
-		// TODO the header we are testing currently is for MS DOS 5.00 boot sector, so we should get rid of it.
-		// Definitely after add sanitising expand_dim though - feeding random images to it can cause so many crashes.
-		uint8_t *expanded = expand_dim(FALSE);
-		if (!expanded)
+		// First let's see if it's an obvious sized image, then we won't need to expand
+		if (!guess_size((int)disk_image.file_size))
 		{
-			return J_INVALID_DIM;
+			// Maybe ECopy? Definitely needs unpacking to flat buffer
+			// TODO the header we are testing currently is for MS DOS 5.00 boot sector, so we should get rid of it.
+			// Definitely after add sanitising expand_dim though - feeding random images to it can cause so many crashes.
+			uint8_t *expanded = expand_dim(FALSE);
+			if (!expanded)
+			{
+				return J_INVALID_DIM;
+			}
+			free(disk_image.buffer);
+			disk_image.buffer = expanded;
 		}
-		free(disk_image.buffer);
-		disk_image.buffer = expanded;
 	}
 	else if (!guess_size((int)disk_image.file_size))
 	{
 		free(disk_image.buffer);
 		return J_INVALID_DIM;
-
 	}
 	return J_OK;
 }
