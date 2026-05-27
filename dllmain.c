@@ -383,15 +383,19 @@ BOOL guess_size(int size)
 		start_sectors = 21;
 	}
 	for (tracks = 86; tracks > 0; tracks--) {
-		for (sectors = start_sectors; sectors >= start_sectors - 3; sectors--) {
-			if (!(size % tracks)) {
-				if ((size % (tracks * sectors * 2 * 512)) == 0) {
+		for (sectors = start_sectors; sectors >= start_sectors - 3; sectors--)
+		{
+			if (!(size % tracks))
+			{
+				if (((size % (tracks * sectors * 2 * 512)) == 0) && (tracks * sectors * 2 * 512 == size))
+				{
 					disk_image.image_tracks = tracks;
 					disk_image.image_sides = 2;
 					disk_image.image_sectors = sectors;
 					return TRUE;
 				}
-				else if ((size % (tracks * sectors * 1 * 512)) == 0) {
+				else if (((size % (tracks * sectors * 1 * 512)) == 0) && (tracks * sectors * 1 * 512 == size))
+				{
 					disk_image.image_tracks = tracks;
 					disk_image.image_sides = 1;
 					disk_image.image_sectors = sectors;
@@ -459,6 +463,13 @@ unsigned char *expand_dim(BOOL fastcopy_header)
 		total_clusters= total_disk_sectors / lbr->bpb.SPC;
 		bytes_left= (int)(disk_image.file_size - ((lbr->bpb.SPF_h<<8)|(lbr->bpb.SPF_l)) * 512);
 		reserved_sectors = (lbr->bpb.RES_l);
+
+		if (disk_image.file_size == total_disk_sectors * 512)
+		{
+			// Disk was not stored using "get used" strategy, therefore it is expanded already
+			return s;
+		}
+
 		//bytes_left -= 2;
 		disk_image.image_sectors = (lbr->bpb.SPT_h << 8) | (lbr->bpb.SPT_l);
 		disk_image.image_sides=(lbr->bpb.NSIDES_h<<8)|(lbr->bpb.NSIDES_l);
@@ -525,7 +536,6 @@ uint32_t DFS_HostAttach(tArchive *arch)
 		disk_image.image_opened_read_only = TRUE;
 	}
 		
-
 	fseek(disk_image.file_handle, 0, SEEK_END);
 	disk_image.file_size = _ftelli64(disk_image.file_handle);
 	fseek(disk_image.file_handle, 0, SEEK_SET);
@@ -612,20 +622,16 @@ uint32_t DFS_HostAttach(tArchive *arch)
 		|| (disk_image.buffer[0] == 0xeb && disk_image.buffer[1] == 0x34 && disk_image.buffer[2] == 0x90)
 		|| (disk_image.buffer[0] == 0xe9 && disk_image.buffer[1] == 0x00 && disk_image.buffer[2] == 0x4e))
 	{
-		// First let's see if it's an obvious sized image, then we won't need to expand
-		if (!guess_size((int)disk_image.file_size))
+		// Maybe ECopy? Definitely needs unpacking to flat buffer
+		// TODO the header we are testing currently is for MS DOS 5.00 boot sector, so we should get rid of it.
+		// Definitely after add sanitising expand_dim though - feeding random images to it can cause so many crashes.
+		uint8_t* expanded = expand_dim(FALSE);
+		if (!expanded)
 		{
-			// Maybe ECopy? Definitely needs unpacking to flat buffer
-			// TODO the header we are testing currently is for MS DOS 5.00 boot sector, so we should get rid of it.
-			// Definitely after add sanitising expand_dim though - feeding random images to it can cause so many crashes.
-			uint8_t *expanded = expand_dim(FALSE);
-			if (!expanded)
-			{
-				return J_INVALID_DIM;
-			}
-			free(disk_image.buffer);
-			disk_image.buffer = expanded;
+			return J_INVALID_DIM;
 		}
+		free(disk_image.buffer);
+		disk_image.buffer = expanded;
 	}
 	else if (!guess_size((int)disk_image.file_size))
 	{
@@ -973,6 +979,10 @@ uint32_t scan_files(char *path, VOLINFO *vi, char *partition_prefix)
 		for (;;) {
 			lastEntry = findLastEntry();
 			ret = DFS_GetNext(vi, &di, &(*lastEntry).de);
+			if (ret == DFS_NOTFOUND)
+			{
+				continue;
+			}
 			if (ret != DFS_OK) break;
 			if (lastEntry->de.name[0] == 0) continue;
 			dir_to_canonical(filename_canonical, lastEntry->de.name);
@@ -1115,7 +1125,7 @@ tArchive* Open(tOpenArchiveData* wcx_archive)
 		return NULL;
 	}
 	arch->volume_dirty = FALSE;
-	strcpy_s(arch->archname,MAX_PATH, wcx_archive->ArcName);
+	strcpy_s(arch->archname, MAX_PATH, wcx_archive->ArcName);
 	pCurrentArchive = arch;
 
 	// trying to open
@@ -1957,7 +1967,10 @@ uint32_t scan_folder_and_delete(PVOLINFO vi, char *path)
 	{
 		ret = DFS_GetNext(vi, di, &de);
 
-		if (ret == DFS_EOF) break;
+		if (ret == DFS_EOF)
+		{
+			break;
+		}
 
 		if (de.name[0] == 0) continue;
 		if (strcmp((char *)de.name, ".          \x10") == 0) continue;

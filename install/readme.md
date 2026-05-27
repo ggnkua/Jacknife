@@ -98,6 +98,8 @@ The current supported set of commands and their syntax is as follows:
 - `samaritan -c <archive name> <extra parameters> <list of files to add>`: This will create an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. Note that the *archive name* must not exist. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
 - `samaritan -a <archive name> <extra parameters> <list of files to add>`: This will open an image file with the name *archive name* and will proceed in adding all files in the *list of files to add*. For the time being do *not* supply absolute paths. The only properly tested mode is to supply files relative to the current path, as they will be added with all the subfolders they might be in. Also note that starting a relative path with a `..` to move up one diretcory will most likely result in an error.
 - `samaritan -d <archive name> <list of files to delete>`: This will attempt to delete all files in *list of files to delete* from the archive `archive name`.
+- `samaritan -v <archive name>`: This will test the archive.
+- `samaritan -x <archive name> <target path>`: This will etract the archive into target path (must exist beforehand).
 - `samaritan -h`: Prints usage information and exits.
 
 `<extra parameters>` are the following:

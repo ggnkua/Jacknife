@@ -709,7 +709,7 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 				// tIn: in some rare cases this unfortunatly leads to an endless loop (see e.g. ODDSTUFF.MSA or INDUST33.MSA),
 				//      so let's not loop on /any/ entry that's a volume ID, but just ignore entries that are volume IDs 
 				//      AND match the name we're looking for
-			} while (!result && memcmp(de.name, tmpfn, 11) || ((de.attr & ATTR_VOLUME_ID)== ATTR_VOLUME_ID && memcmp(de.name, tmpfn, 11)==0) );
+			} while (!result && memcmp(de.name, tmpfn, 11) || ((de.attr & ATTR_VOLUME_ID) == ATTR_VOLUME_ID && memcmp(de.name, tmpfn, 11) == 0));
 
 			if (!memcmp(de.name, tmpfn, 11) && ((de.attr & ATTR_DIRECTORY) == ATTR_DIRECTORY)) {
 				if (volinfo->filesystem == FAT32) {
@@ -729,6 +729,11 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 
 				dirinfo->currentsector = 0;
 				dirinfo->currententry = 0;
+
+				if (!dirinfo->currentcluster)
+				{
+					return DFS_OK;
+				}
 
 				if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->dataarea + ((dirinfo->currentcluster - 2) * volinfo->secperclus), 1))
 					return DFS_ERRMISC;
@@ -762,12 +767,12 @@ uint32_t DFS_OpenDir(PVOLINFO volinfo, uint8_t *dirname, PDIRINFO dirinfo)
 uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 {
 	uint32_t tempint=0;	// required by DFS_GetFAT
-	uint32_t tempcluster;	// ggn: protection against end of directory entries
 
 	// Do we need to read the next sector of the directory?
 	if (dirinfo->currententry >= SECTOR_SIZE / sizeof(DIRENT)) {
 		dirinfo->currententry = 0;
 		dirinfo->currentsector++;
+		uint32_t tempclustervalue;	// ggn: protection against end of directory entries
 
 		// Root directory; special case handling 
 		// Note that currentcluster will only ever be zero if both:
@@ -805,12 +810,12 @@ uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 				// ggn: we can't just assign the result directly because we might get an end-of-directory
 				//      marker and the caller might need dirinfo->currentcluster's last valid value.
 				//dirinfo->currentcluster = DFS_GetFAT(volinfo, dirinfo->scratch, &tempint, dirinfo->currentcluster);
-				tempcluster = DFS_GetFAT(volinfo, dirinfo->scratch, &tempint, dirinfo->currentcluster);
+				tempclustervalue = DFS_GetFAT(volinfo, dirinfo->scratch, &tempint, dirinfo->currentcluster);
 				// ggn: Handle (hopefully) a corner case of the directory having all its clusters' worth of entries
 				//      filled completely. 
-				if ((volinfo->filesystem == FAT12 && tempcluster == 0x00000fff) ||
-					(volinfo->filesystem == FAT16 && tempcluster == 0x0000ffff) ||
-					(volinfo->filesystem == FAT32 && tempcluster == 0xffffffff))
+				if ((volinfo->filesystem == FAT12 && tempclustervalue == 0x00000fff) ||
+					(volinfo->filesystem == FAT16 && tempclustervalue == 0x0000ffff) ||
+					(volinfo->filesystem == FAT32 && tempclustervalue == 0xffffffff))
 				{
 					// We are at the end of the directory chain. If this is a normal
 					// find operation, we should indicate that there is nothing more
@@ -823,7 +828,7 @@ uint32_t DFS_GetNext(PVOLINFO volinfo, PDIRINFO dirinfo, PDIRENT dirent)
 					else
 						return DFS_ALLOCNEW;
 				}
-				dirinfo->currentcluster = tempcluster;
+				dirinfo->currentcluster = tempclustervalue;
 			}
 			if (DFS_ReadSector(volinfo->unit, dirinfo->scratch, volinfo->dataarea + ((dirinfo->currentcluster - 2) * volinfo->secperclus) + dirinfo->currentsector, 1))
 				return DFS_ERRMISC;
