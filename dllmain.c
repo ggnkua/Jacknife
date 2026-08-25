@@ -321,20 +321,24 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize)
 
 	int offset = 10;
 	int out = 0;
-	for (int i = 0; i < endTrack * sides; i++) {
+	for (int i = 0; i < endTrack * sides; i++)
+	{
 		int trackLen = packedMsa[offset++];
 		trackLen <<= 8;
 		trackLen += packedMsa[offset++];
-		if (trackLen != 512 * sectors) {
-			for (; trackLen > 0; trackLen--) {
-				unpackedData[out++] = packedMsa[offset++];
+		if (trackLen != 512 * sectors)
+		{
+			for (; trackLen > 0; trackLen--)
+			{
 				// Bounds check against corrupt MSA images
-				if (out > unpackedSize || offset > packedSize)
+				if (out >= unpackedSize || offset > packedSize)
 				{
 					free(unpackedData);
 					return 0;
 				}
-				if (unpackedData[out - 1] == 0xe5) {
+				unpackedData[out++] = packedMsa[offset++];
+				if (unpackedData[out - 1] == 0xe5)
+				{
 					// Bounds check against corrupt MSA images
 					if (offset + 4 - 1 > packedSize)
 					{
@@ -347,6 +351,11 @@ uint8_t *unpack_msa(tArchive *arch, uint8_t *packedMsa, int packedSize)
 					runLen += packedMsa[offset++];
 					trackLen -= 3;
 					out--;
+					if (out + runLen > unpackedSize)
+					{
+						free(unpackedData);
+						return 0;
+					}
 					for (unsigned int ii = 0; ii < runLen && out < unpackedSize; ii++) {
 						unpackedData[out++] = data;
 					}
@@ -630,8 +639,21 @@ uint32_t DFS_HostAttach(tArchive *arch)
 		{
 			return J_INVALID_DIM;
 		}
-		free(disk_image.buffer);
+		if (expanded != disk_image.buffer)
+		{
+			free(disk_image.buffer);
+		}
 		disk_image.buffer = expanded;
+
+		if (disk_image.image_sectors == 0 || disk_image.image_sides == 0 || disk_image.image_tracks == 0)
+		{
+			// If we reached this point and we're still missing disk geometry, we should at least take a stab at guessing it
+			if (!guess_size((int)disk_image.file_size))
+			{
+				free(disk_image.buffer);
+				return J_INVALID_DIM;
+			}
+		}
 	}
 	else if (!guess_size((int)disk_image.file_size))
 	{

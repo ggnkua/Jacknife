@@ -274,7 +274,7 @@ uint32_t DFS_GetVolInfo(uint8_t unit, uint8_t *scratchsector, uint32_t startsect
 	{
 		int sides = (lbr->bpb.NSIDES_h << 8) | lbr->bpb.NSIDES_l;
 		int disk_image_sectors = (int)disk_image.file_size / SECTOR_SIZE;
-		int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
+		//int bpb_total_sectors = volinfo->numsecs + volinfo->reservedsecs + 2 * volinfo->secperfat + volinfo->rootentries / 16;
 		int bpb_sectors_per_track = (lbr->bpb.SPT_h << 8) | lbr->bpb.SPT_l;
 		if ((sides == 1 && disk_image.image_sides == 2) || (bpb_sectors_per_track != disk_image.image_sectors))
 		{
